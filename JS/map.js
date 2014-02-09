@@ -145,71 +145,65 @@ Map.prototype.addRooms = function addRooms(){
 
 Map.prototype.generateCorridors = function generateCorridors(x, y, prevx, prevy){
 
-    var xDifference = prevx - x;
-    var yDifference = prevy - y;
+    function generateHorizontalCorridor(i, map){
 
+        //Set the current tile to floor
+        map.tiles[y][i] = 2;
+
+        //Generate walls around this hallway
+        if(map.tiles[y + 1][i] === 0){
+            map.tiles[y + 1][i] = 1;
+        }
+        if(map.tiles[y - 1][i] === 0){
+            map.tiles[y - 1][i] = 1;
+        }
+
+    }
+
+    function generateVerticalCorridor(i, map){
+
+        //Set the current tile to floor
+        map.tiles[i][prevx] = 2;
+
+        //Generate walls around this hallway
+        if(map.tiles[i][prevx + 1] === 0){
+            map.tiles[i][prevx + 1] = 1;
+        }
+        if(map.tiles[i][prevx - 1] === 0){
+            map.tiles[i][prevx - 1] = 1;
+        }
+
+    }
+
+    //Horizontal Corridors
     if((x - prevx) > 0){
 
-        //If the difference is positive
+        //Corridor going left
         for(i = x; i >= prevx; i--){
-
-            this.tiles[y][i] = 2;
-
-            if(this.tiles[y + 1][i] === 0){
-                this.tiles[y + 1][i] = 1;
-            }
-            if(this.tiles[y - 1][i] === 0){
-                this.tiles[y - 1][i] = 1;
-            }
-
-
+            generateHorizontalCorridor(i, this);
         }
+
     }else{
         
-        //If the difference is negative
+        //Corridor going right
         for(i = x; i <= prevx; i++){
-
-            this.tiles[y][i] = 2;
-
-            if(this.tiles[y + 1][i] === 0){
-                this.tiles[y + 1][i] = 1;
-            }
-            if(this.tiles[y - 1][i] === 0){
-                this.tiles[y - 1][i] = 1;
-            }
-
+            generateHorizontalCorridor(i, this);
         }
     }
 
+    //Vertical Corridors
     if((y - prevy) > 0){
         
-        //If the difference is positive
+        //If the corridor is going up
         for(i = y; i >= prevy; i--){
-
-            this.tiles[i][prevx] = 2;
-
-            if(this.tiles[i][prevx + 1] === 0){
-                this.tiles[i][prevx + 1] = 1;
-            }
-            if(this.tiles[i][prevx - 1] === 0){
-                this.tiles[i][prevx - 1] = 1;
-            }
-
+            generateVerticalCorridor(i, this);
         }
+
     }else{
         
-        //If the difference is negative
+        //If the corridor is going down
         for(i = y; i <= prevy; i++){
-
-            this.tiles[i][prevx] = 2;
-
-            if(this.tiles[i][prevx + 1] === 0){
-                this.tiles[i][prevx + 1] = 1;
-            }
-            if(this.tiles[i][prevx - 1] === 0){
-                this.tiles[i][prevx - 1] = 1;
-            }
-
+            generateVerticalCorridor(i, this);
         } 
     }
 
