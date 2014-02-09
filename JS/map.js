@@ -67,9 +67,16 @@ Map.prototype.generateRooms = function generateRooms(){
 
         //Check if this room intersects with the other rooms, if not, add it to the list
         if(!oRoom.intersects(this.rooms)){
+
+            //The room doesn't intersect, initialize the room layout
+            oRoom.initialize();
+
+            //Add the room to the room list
             this.rooms.push(oRoom);
+
             //Reset tries back to zero, giving the next room equal chances of spawning
             var tries = 0;
+
         }
 
     };
@@ -84,11 +91,17 @@ Map.prototype.addRooms = function addRooms(){
         //Loop through every horizontal row
         for(y = this.rooms[i].y1; y < this.rooms[i].y2; y++){
 
+            //What is the current Y position in the layout of the current room
+            var layoutYPos = this.rooms[i].y2 - y - 1;
+
             //Loop through every vertical row
             for(x = this.rooms[i].x1; x < this.rooms[i].x2; x++){
 
-                //Dig out this place on the map!
-                this.tiles[y][x] = 1;
+            //What is the current X position in the layout of the current room
+            var layoutXPos = this.rooms[i].x2 - x - 1;    
+
+                //Place the tile that is on the layout on this position on the map
+                this.tiles[y][x] = this.rooms[i].layout[layoutYPos][layoutXPos];
 
             }
 
@@ -115,6 +128,9 @@ Map.prototype.draw = function draw(){
                 break;
                 case(1):
                     oContext.fillStyle = 'white';
+                break;
+                case(2):
+                    oContext.fillStyle = 'grey';
                 break;
 
             }
