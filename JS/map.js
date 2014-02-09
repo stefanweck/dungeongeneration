@@ -3,8 +3,9 @@ function Map(){
     //Map properties
     this.tilesX = 60;
     this.tilesY = 40;
-    this.maxRooms = 6;
+    this.maxRooms = 8;
     this.rooms = [];
+    this.corridors = [];
     this.tiles = [];
 
     //The width and height of a single tile
@@ -86,8 +87,17 @@ Map.prototype.generateRooms = function generateRooms(){
 
 Map.prototype.addRooms = function addRooms(){
 
+    //Define variables
+    var previousExit = [];
+    var currentExit = [];
+
     //Loop through each room in the list
     for (var i = 0; i < this.rooms.length; i++) {
+
+        //Set the last exit to the previous exits variable
+        //TODO: Find out why cloning doesn't work
+        previousExit['x'] = currentExit['x'];
+        previousExit['y'] = currentExit['y'];
 
         //Loop through every horizontal row
         for(y = this.rooms[i].y1; y < this.rooms[i].y2; y++){
@@ -99,22 +109,109 @@ Map.prototype.addRooms = function addRooms(){
             for(x = this.rooms[i].x1; x < this.rooms[i].x2; x++){
 
             //What is the current X position in the layout of the current room
-            var layoutXPos = this.rooms[i].x2 - x - 1;    
+            var layoutXPos = this.rooms[i].x2 - x - 1;
+            var currentTile = this.rooms[i].layout[layoutYPos][layoutXPos];    
 
                 //Place the tile that is on the layout on this position on the map
-                this.tiles[y][x] = this.rooms[i].layout[layoutYPos][layoutXPos];
+                this.tiles[y][x] = currentTile;
+
+                //If the current tile is an exit, set the variables for this position
+                if(currentTile === 3){
+                    currentExit['x'] = x;
+                    currentExit['y'] = y;
+                }
 
             }
 
         }
 
+        //Add corridor when this is not the first room
+        if(i !== 0){
+            var corridor = {'x' : currentExit['x'], 'y' : currentExit['y'], 'prevx' : previousExit['x'], 'prevy' : previousExit['y']};
+            this.corridors.push(corridor);
+        }
+
+    }
+
+    //After all the rooms are placed, go and generate the corridors
+    for(i = 0; i < this.corridors.length; i++){
+
+        //Generate a corridor from this position to the previous room's exit
+        this.generateCorridors(this.corridors[i].x, this.corridors[i].y, this.corridors[i].prevx, this.corridors[i].prevy);
+
     }
 
 }
 
-Map.prototype.generateCorridors = function generateCorridors(){
+Map.prototype.generateCorridors = function generateCorridors(x, y, prevx, prevy){
+
+    var xDifference = prevx - x;
+    var yDifference = prevy - y;
+
+    if((x - prevx) > 0){
+
+        //If the difference is positive
+        for(i = x; i >= prevx; i--){
+
+            this.tiles[y][i] = 2;
+
+            if(this.tiles[y + 1][i] === 0){
+                this.tiles[y + 1][i] = 1;
+            }
+            if(this.tiles[y - 1][i] === 0){
+                this.tiles[y - 1][i] = 1;
+            }
 
 
+        }
+    }else{
+        
+        //If the difference is negative
+        for(i = x; i <= prevx; i++){
+
+            this.tiles[y][i] = 2;
+
+            if(this.tiles[y + 1][i] === 0){
+                this.tiles[y + 1][i] = 1;
+            }
+            if(this.tiles[y - 1][i] === 0){
+                this.tiles[y - 1][i] = 1;
+            }
+
+        }
+    }
+
+    if((y - prevy) > 0){
+        
+        //If the difference is positive
+        for(i = y; i >= prevy; i--){
+
+            this.tiles[i][prevx] = 2;
+
+            if(this.tiles[i][prevx + 1] === 0){
+                this.tiles[i][prevx + 1] = 1;
+            }
+            if(this.tiles[i][prevx - 1] === 0){
+                this.tiles[i][prevx - 1] = 1;
+            }
+
+        }
+    }else{
+        
+        //If the difference is negative
+        for(i = y; i <= prevy; i++){
+
+            this.tiles[i][prevx] = 2;
+
+            if(this.tiles[i][prevx + 1] === 0){
+                this.tiles[i][prevx + 1] = 1;
+            }
+            if(this.tiles[i][prevx - 1] === 0){
+                this.tiles[i][prevx - 1] = 1;
+            }
+
+        } 
+    }
 
 }
 
@@ -141,6 +238,9 @@ Map.prototype.draw = function draw(){
                 break;
                 case(3):
                     oContext.fillStyle = 'red';
+                break;
+                case(4):
+                    oContext.fillStyle = 'blue';
                 break;
 
             }
