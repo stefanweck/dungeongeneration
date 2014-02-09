@@ -32,9 +32,9 @@ Room.prototype.initialize = function initialize(){
 
             //Check if the position filled has to be a wall or floor
             if(y == 0 || y == this.h - 1 || x == 0 || x == this.w - 1){
-                this.layout[y][x] = 1; 
+                this.layout[y][x] = 1;
             }else{
-                this.layout[y][x] = 2;  
+                this.layout[y][x] = 2;
             }
 
         }

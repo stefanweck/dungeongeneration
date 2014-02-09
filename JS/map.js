@@ -1,20 +1,20 @@
 function Map(){
 
     //Map properties
-    this.tilesX = 36;
-    this.tilesY = 24;
-    this.maxRooms = 5;
+    this.tilesX = 60;
+    this.tilesY = 40;
+    this.maxRooms = 6;
     this.rooms = [];
     this.tiles = [];
 
     //The width and height of a single tile
-    this.tileSize = 25;
+    this.tileSize = 15;
 
     //Room properties ( also in tiles )
-    this.minRoomWidth = 4;
-    this.maxRoomWidth = 8;
-    this.minRoomHeight = 4;
-    this.maxRoomHeight = 8;
+    this.minRoomWidth = 6;
+    this.maxRoomWidth = 12;
+    this.minRoomHeight = 6;
+    this.maxRoomHeight = 12;
 
 }
 
@@ -127,10 +127,10 @@ Map.prototype.draw = function draw(){
                     oContext.fillStyle = 'black';
                 break;
                 case(1):
-                    oContext.fillStyle = 'white';
+                    oContext.fillStyle = 'grey';
                 break;
                 case(2):
-                    oContext.fillStyle = 'grey';
+                    oContext.fillStyle = 'white';
                 break;
 
             }
