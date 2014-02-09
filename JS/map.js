@@ -1,46 +1,3 @@
-//Initialize variables
-var oCanvas;
-var oContext;
-
-window.onload = function(){
-
-    initializeCanvas();
-
-}
-
-function initializeCanvas(){
-
-    //Initialize the canvas
-    oCanvas = document.getElementById("canvas");
-    oContext = oCanvas.getContext("2d");
-
-    //Set the width and height of the canvas
-    oCanvas.width = 900;
-    oCanvas.height = 600;
-
-    //Set click event to the canvas
-    oCanvas.addEventListener('click', initializeMap, false);
-
-    //Initialize the map object
-    initializeMap();
-
-}
-
-function initializeMap(){
-
-    //Create and initialize the map object
-    oMap = new Map();
-    oMap.initialize();
-
-    //Generate rooms for this map
-    oMap.generateRooms();
-    oMap.addRooms();
-
-    //Draw the map on canvas
-    oMap.draw();
-
-}
-
 function Map(){
 
     //Map properties
@@ -168,46 +125,5 @@ Map.prototype.draw = function draw(){
         }
 
     }
-
-}
-
-function Room(x, y, w, h){
-
-    //Coordinates of every corner of the room
-    this.x1 = x;
-    this.x2 = w + x;
-    this.y1 = y;
-    this.y2 = y + h;
-
-    //Widht and height of the room in number of tiles
-    this.w = w;
-    this.h = h;
-
-    //Position of this room on the grid
-    this.xPos = x * 25;
-    this.yPos = y * 25;
-
-}
-
-Room.prototype.intersects = function intersects(rooms){
-
-    //Loop through every room in the list
-    for (var i = 0; i < rooms.length; i++) {
-
-        //Check if the room intersects with the current room
-        if(this.x1 <= rooms[i].x2 && this.x2 >= rooms[i].x1 && this.y1 <= rooms[i].y2 && this.y2 >= rooms[i].y1){
-            return true;
-        }
-
-    }
-    //If the room doesn't intersect another room, return false
-    return false;
-
-}
-
-function randomNumber(from,to){
-
-    //Function to generate a random number
-    return Math.floor(Math.random()*(to-from+1)+from);
 
 }
