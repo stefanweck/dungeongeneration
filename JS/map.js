@@ -70,6 +70,7 @@ Map.prototype.generateRooms = function generateRooms(){
 
             //The room doesn't intersect, initialize the room layout
             oRoom.initialize();
+            oRoom.generateExit();
 
             //Add the room to the room list
             this.rooms.push(oRoom);
@@ -111,6 +112,12 @@ Map.prototype.addRooms = function addRooms(){
 
 }
 
+Map.prototype.generateCorridors = function generateCorridors(){
+
+
+
+}
+
 Map.prototype.draw = function draw(){
 
     //Loop through every horizontal row
@@ -131,6 +138,9 @@ Map.prototype.draw = function draw(){
                 break;
                 case(2):
                     oContext.fillStyle = 'white';
+                break;
+                case(3):
+                    oContext.fillStyle = 'red';
                 break;
 
             }

@@ -58,3 +58,28 @@ Room.prototype.intersects = function intersects(rooms){
     return false;
 
 }
+
+Room.prototype.generateExit = function generateExit(){
+
+    //Add an exit on one of the sides of the wall
+    switch(randomNumber(1,4)){
+
+        case(1): //Top
+            this.layout[0][randomNumber(1, this.w - 2)] = 3;
+        break;
+
+        case(2): //Right
+            this.layout[randomNumber(1, this.h - 2)][this.w - 1] = 3;
+        break;
+
+        case(3): //Bottom
+            this.layout[this.h - 1][randomNumber(1, this.w - 2)] = 3;
+        break;
+
+        case(4): //Left
+            this.layout[randomNumber(1, this.h - 2)][0] = 3;
+        break;
+
+    }
+
+}
