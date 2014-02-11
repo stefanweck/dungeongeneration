@@ -1,9 +1,9 @@
-function Map(){
+function Map(tileX, TilexY, maxRooms){
 
     //Map properties
-    this.tilesX = 60;
-    this.tilesY = 40;
-    this.maxRooms = 8;
+    this.tilesX = tileX;
+    this.tilesY = TilexY;
+    this.maxRooms = maxRooms;
     this.rooms = [];
     this.corridors = [];
     this.tiles = [];
@@ -16,6 +16,9 @@ function Map(){
     this.maxRoomWidth = 12;
     this.minRoomHeight = 6;
     this.maxRoomHeight = 12;
+
+    //Objects that belong to a map
+    this.roomFactory = new RoomFactory();
 
 }
 
@@ -37,53 +40,23 @@ Map.prototype.initialize = function initialize(){
 
     }
 
-}
+};
 
-Map.prototype.generateRooms = function generateRooms(){
+Map.prototype.roomIntersectsWith = function roomIntersectsWith(room){
 
-    //Maximum number of tries before stopping the placement of more rooms
-    var maxTries = this.maxRooms + 10;
-    var tries = 0;
+    //Loop through every room in the list
+    for (var i = 0; i < this.rooms.length; i++) {
 
-    //Create rooms and add them to the list
-    while (this.rooms.length < this.maxRooms) {
-
-        //Check if the limit has been reached, this prevents the while loop from crashing your page
-        //We assume there is no space left on the map and break the loop
-        if(tries >= maxTries){
-            break;
+        //Check if the room intersects with the current room
+        if(room.x1 <= this.rooms[i].x2 && room.x2 >= this.rooms[i].x1 && room.y1 <= this.rooms[i].y2 && room.y2 >= this.rooms[i].y1){
+            return true;
         }
 
-        //Generate random values ( in tiles )
-        var w = randomNumber(this.minRoomWidth, this.maxRoomWidth);
-        var h = randomNumber(this.minRoomHeight, this.maxRoomHeight);
-        var x = randomNumber(1, this.tilesX - w - 1);
-        var y = randomNumber(1, this.tilesY - h - 1);
+    }
+    //If the room doesn't intersect another room, return false
+    return false;
 
-        //Create a new room with these values
-        var oRoom = new Room(x, y, w, h);
-
-        //We tryed to create a room at a certain position
-        tries++;
-
-        //Check if this room intersects with the other rooms, if not, add it to the list
-        if(!oRoom.intersects(this.rooms)){
-
-            //The room doesn't intersect, initialize the room layout
-            oRoom.initialize();
-            oRoom.generateExit();
-
-            //Add the room to the room list
-            this.rooms.push(oRoom);
-
-            //Reset tries back to zero, giving the next room equal chances of spawning
-            var tries = 0;
-
-        }
-
-    };
-
-}
+};
 
 Map.prototype.addRooms = function addRooms(){
 
@@ -110,7 +83,7 @@ Map.prototype.addRooms = function addRooms(){
 
             //What is the current X position in the layout of the current room
             var layoutXPos = this.rooms[i].x2 - x - 1;
-            var currentTile = this.rooms[i].layout[layoutYPos][layoutXPos];    
+            var currentTile = this.rooms[i].layout[layoutYPos][layoutXPos];
 
                 //Place the tile that is on the layout on this position on the map
                 this.tiles[y][x] = currentTile;
@@ -133,117 +106,7 @@ Map.prototype.addRooms = function addRooms(){
 
     }
 
-    //After all the rooms are placed, go and generate the corridors
-    for(i = 0; i < this.corridors.length; i++){
+    //Generate the corridors for these rooms
+    this.roomFactory.genereteCorridors(this);
 
-        //Generate a corridor from this position to the previous room's exit
-        this.generateCorridors(this.corridors[i].x, this.corridors[i].y, this.corridors[i].prevx, this.corridors[i].prevy);
-
-    }
-
-}
-
-Map.prototype.generateCorridors = function generateCorridors(x, y, prevx, prevy){
-
-    function generateHorizontalCorridor(i, map){
-
-        //Set the current tile to floor
-        map.tiles[y][i] = 2;
-
-        //Generate walls around this hallway
-        if(map.tiles[y + 1][i] === 0){
-            map.tiles[y + 1][i] = 1;
-        }
-        if(map.tiles[y - 1][i] === 0){
-            map.tiles[y - 1][i] = 1;
-        }
-
-    }
-
-    function generateVerticalCorridor(i, map){
-
-        //Set the current tile to floor
-        map.tiles[i][prevx] = 2;
-
-        //Generate walls around this hallway
-        if(map.tiles[i][prevx + 1] === 0){
-            map.tiles[i][prevx + 1] = 1;
-        }
-        if(map.tiles[i][prevx - 1] === 0){
-            map.tiles[i][prevx - 1] = 1;
-        }
-
-    }
-
-    //Horizontal Corridors
-    if((x - prevx) > 0){
-
-        //Corridor going left
-        for(i = x; i >= prevx; i--){
-            generateHorizontalCorridor(i, this);
-        }
-
-    }else{
-        
-        //Corridor going right
-        for(i = x; i <= prevx; i++){
-            generateHorizontalCorridor(i, this);
-        }
-    }
-
-    //Vertical Corridors
-    if((y - prevy) > 0){
-        
-        //If the corridor is going up
-        for(i = y; i >= prevy; i--){
-            generateVerticalCorridor(i, this);
-        }
-
-    }else{
-        
-        //If the corridor is going down
-        for(i = y; i <= prevy; i++){
-            generateVerticalCorridor(i, this);
-        } 
-    }
-
-}
-
-Map.prototype.draw = function draw(){
-
-    //Loop through every horizontal row
-    for(y = 0; y < this.tilesY; y++){
-
-        //Loop through every vertical row
-        for(x = 0; x < this.tilesX; x++){
-
-            //Create different colors for each type of tile
-            switch(this.tiles[y][x]){
-
-                //This could be done a little bit better in the next version
-                case(0):
-                    oContext.fillStyle = 'black';
-                break;
-                case(1):
-                    oContext.fillStyle = 'grey';
-                break;
-                case(2):
-                    oContext.fillStyle = 'white';
-                break;
-                case(3):
-                    oContext.fillStyle = 'red';
-                break;
-                case(4):
-                    oContext.fillStyle = 'blue';
-                break;
-
-            }
-
-            //Create a rectangle!
-            oContext.fillRect(x * this.tileSize, y * this.tileSize, this.tileSize, this.tileSize);
-
-        }
-
-    }
-
-}
+};

@@ -31,7 +31,7 @@ Room.prototype.initialize = function initialize(){
         for(x = 0; x < this.w; x++){
 
             //Check if the position filled has to be a wall or floor
-            if(y == 0 || y == this.h - 1 || x == 0 || x == this.w - 1){
+            if(y === 0 || y === this.h - 1 || x === 0 || x === this.w - 1){
                 this.layout[y][x] = 1;
             }else{
                 this.layout[y][x] = 2;
@@ -41,23 +41,7 @@ Room.prototype.initialize = function initialize(){
 
     }
 
-}
-
-Room.prototype.intersects = function intersects(rooms){
-
-    //Loop through every room in the list
-    for (var i = 0; i < rooms.length; i++) {
-
-        //Check if the room intersects with the current room
-        if(this.x1 <= rooms[i].x2 && this.x2 >= rooms[i].x1 && this.y1 <= rooms[i].y2 && this.y2 >= rooms[i].y1){
-            return true;
-        }
-
-    }
-    //If the room doesn't intersect another room, return false
-    return false;
-
-}
+};
 
 Room.prototype.generateExit = function generateExit(){
 
@@ -82,4 +66,4 @@ Room.prototype.generateExit = function generateExit(){
 
     }
 
-}
+};

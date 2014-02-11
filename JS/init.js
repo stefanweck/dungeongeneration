@@ -1,3 +1,6 @@
+//TODO
+//Add default settings, just like jquery's extend options
+
 //Initialize variables
 var oCanvas;
 var oContext;
@@ -6,7 +9,7 @@ window.onload = function(){
 
     initializeCanvas();
 
-}
+};
 
 function initializeCanvas(){
 
@@ -19,24 +22,18 @@ function initializeCanvas(){
     oCanvas.height = 600;
 
     //Set click event to the canvas
-    oCanvas.addEventListener('click', initializeMap, false);
+    oCanvas.addEventListener('click', function(){
+        dungeon = new Dungeon(60, 40, 10);
+    }, false);
 
-    //Initialize the map object
-    initializeMap();
-
-}
-
-function initializeMap(){
-
-    //Create and initialize the map object
-    oMap = new Map();
-    oMap.initialize();
-
-    //Generate rooms for this map
-    oMap.generateRooms();
-    oMap.addRooms();
-
-    //Draw the map on canvas
-    oMap.draw();
+    //Create a new dungeon
+    var dungeon = new Dungeon(
+        //Tiles X
+        60,
+        //Tiles Y
+        40,
+        //Maximum number of rooms
+        10
+    );
 
 }
