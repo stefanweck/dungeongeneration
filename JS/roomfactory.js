@@ -97,32 +97,32 @@ RoomFactory.prototype.generateCorridor = function generateCorridor(map, x, y, pr
 
 };
 
-RoomFactory.prototype.generateHorizontalCorridor = function generateHorizontalCorridor(map, i, y){
+RoomFactory.prototype.generateHorizontalCorridor = function generateHorizontalCorridor(map, x, y){
 
     //Set the current tile to floor
-    map.tiles[y][i] = 2;
+    map.tiles[y][x] = 2;
 
     //Generate walls around this hallway
-    if(map.tiles[y + 1][i] === 0){
-        map.tiles[y + 1][i] = 1;
+    if(map.tiles[y + 1][x] === 0){
+        map.tiles[y + 1][x] = 1;
     }
-    if(map.tiles[y - 1][i] === 0){
-        map.tiles[y - 1][i] = 1;
+    if(map.tiles[y - 1][x] === 0){
+        map.tiles[y - 1][x] = 1;
     }
 
 };
 
-RoomFactory.prototype.generateVerticalCorridor = function generateVerticalCorridor(map, i, prevx){
+RoomFactory.prototype.generateVerticalCorridor = function generateVerticalCorridor(map, y, prevx){
 
     //Set the current tile to floor
-    map.tiles[i][prevx] = 2;
+    map.tiles[y][prevx] = 2;
 
     //Generate walls around this hallway
-    if(map.tiles[i][prevx + 1] === 0){
-        map.tiles[i][prevx + 1] = 1;
+    if(map.tiles[y][prevx + 1] === 0){
+        map.tiles[y][prevx + 1] = 1;
     }
-    if(map.tiles[i][prevx - 1] === 0){
-        map.tiles[i][prevx - 1] = 1;
+    if(map.tiles[y][prevx - 1] === 0){
+        map.tiles[y][prevx - 1] = 1;
     }
 
 };
