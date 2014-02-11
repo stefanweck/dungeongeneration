@@ -46,22 +46,24 @@ Room.prototype.initialize = function initialize(){
 Room.prototype.generateExit = function generateExit(){
 
     //Add an exit on one of the sides of the wall
+    //But one tile further into the room, so we don't get weird openings
+    //when the generation of a corridor goes the other direction
     switch(randomNumber(1,4)){
 
         case(1): //Top
-            this.layout[0][randomNumber(1, this.w - 2)] = 3;
+            this.layout[1][randomNumber(1, this.w - 2)] = 3;
         break;
 
         case(2): //Right
-            this.layout[randomNumber(1, this.h - 2)][this.w - 1] = 3;
+            this.layout[randomNumber(1, this.h - 2)][this.w - 2] = 3;
         break;
 
         case(3): //Bottom
-            this.layout[this.h - 1][randomNumber(1, this.w - 2)] = 3;
+            this.layout[this.h - 2][randomNumber(1, this.w - 2)] = 3;
         break;
 
         case(4): //Left
-            this.layout[randomNumber(1, this.h - 2)][0] = 3;
+            this.layout[randomNumber(1, this.h - 2)][1] = 3;
         break;
 
     }
