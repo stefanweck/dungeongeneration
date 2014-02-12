@@ -1,70 +1,111 @@
-function Room(x, y, w, h){
+/*
+* Room constructor
+* 
+* @class Roguelike.Room
+* @classdesc A room object that creates his own layout!
+* 
+* @param {int} x - The x coordinate of the top left corner of this room
+* @param {int} y - The y coordinate of the top left corner of this room
+* @param {int} w - The width of this room
+* @param {int} h - The heighth of this room
+*/
+Roguelike.Room = function(x, y, w, h){
 
-    //Coordinates of every corner of the room
+    /*
+    * @property {int} x1 - The X position of the top left corner of this room
+    */
     this.x1 = x;
+
+    /*
+    * @property {int} x2 - The X position of the top right corner of this room
+    */
     this.x2 = w + x;
+
+    /*
+    * @property {int} y1 - The Y position of top left corner of this room
+    */
     this.y1 = y;
+
+    /*
+    * @property {int} y2 - The Y position of bottom left corner of this room
+    */
     this.y2 = y + h;
 
-    //Widht and height of the room in number of tiles
+    /*
+    * @property {int} w - The width of this room, defined in tiles
+    */
     this.w = w;
+
+    /*
+    * @property {int} h - The heigth of this room, defined in tiles
+    */
     this.h = h;
 
-    //Position of this room on the grid
-    this.xPos = x * 25;
-    this.yPos = y * 25;
-
-    //Layout of the room
+    /*
+    * @property {array} layout - The array that contains the layout of this room
+    */
     this.layout = [];
 
-}
+};
 
-Room.prototype.initialize = function initialize(){
+Roguelike.Room.prototype = {
 
-    //Loop through every horizontal row
-    for(y = 0; y < this.h; y++){
+    /*
+    * Initialize the layout of the room, filling it with default tiles
+    * @protected
+    */
+    initialize: function(){
 
-        //Initialize this row
-        this.layout[y] = [];
+        //Loop through every horizontal row
+        for(y = 0; y < this.h; y++){
 
-        //Loop through every vertical row
-        for(x = 0; x < this.w; x++){
+            //Initialize this row
+            this.layout[y] = [];
 
-            //Check if the position filled has to be a wall or floor
-            if(y === 0 || y === this.h - 1 || x === 0 || x === this.w - 1){
-                this.layout[y][x] = 1;
-            }else{
-                this.layout[y][x] = 2;
+            //Loop through every vertical row
+            for(x = 0; x < this.w; x++){
+
+                //Check if the position filled has to be a wall or floor
+                if(y === 0 || y === this.h - 1 || x === 0 || x === this.w - 1){
+                    this.layout[y][x] = new Roguelike.Tile(1, this);
+                }else{
+                    this.layout[y][x] = new Roguelike.Tile(2, this);
+                }
+
             }
 
         }
 
-    }
+    },
 
-};
+    /*
+    * Generate an exit on a random side of this room
+    * @protected
+    */
+    generateExit: function(){
 
-Room.prototype.generateExit = function generateExit(){
+        //Add an exit on one of the sides of the wall
+        //But one tile further into the room, so we don't get weird openings
+        //when the generation of a corridor goes the other direction
+        switch(Roguelike.Utils.randomNumber(1,4)){
 
-    //Add an exit on one of the sides of the wall
-    //But one tile further into the room, so we don't get weird openings
-    //when the generation of a corridor goes the other direction
-    switch(randomNumber(1,4)){
+            case(1): //Top
+                this.layout[this.h - 2][Roguelike.Utils.randomNumber(1, this.w - 2)].type = 3;
+            break;
 
-        case(1): //Top
-            this.layout[1][randomNumber(1, this.w - 2)] = 3;
-        break;
+            case(2): //Bottom
+                this.layout[1][Roguelike.Utils.randomNumber(1, this.w - 2)].type = 3;
+            break;
 
-        case(2): //Right
-            this.layout[randomNumber(1, this.h - 2)][this.w - 2] = 3;
-        break;
+            case(3): //Left
+                this.layout[Roguelike.Utils.randomNumber(1, this.h - 2)][this.w - 2].type = 3;
+            break;
 
-        case(3): //Bottom
-            this.layout[this.h - 2][randomNumber(1, this.w - 2)] = 3;
-        break;
+            case(4): //Right
+                this.layout[Roguelike.Utils.randomNumber(1, this.h - 2)][1].type = 3;
+            break;
 
-        case(4): //Left
-            this.layout[randomNumber(1, this.h - 2)][1] = 3;
-        break;
+        }
 
     }
 
