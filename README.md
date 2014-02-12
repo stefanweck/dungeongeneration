@@ -1,11 +1,18 @@
-<h1>Random Dungeon Generation</h1>
+<h1>Roguelike Javascript game with Canvas</h1>
 
-Version 1.2! This version only includes generation rooms, making sure they don't overlap eachother and corridor generation!
+A roguelike game i am creating purely in javascript on canvas! 
+
+Features:
+- Random Dungeon Generation
+- Corridors between the rooms
+- Random doors at the end of corridors
 
 What's next?
 
-- Configurable amount of exits/entrances to a room
-- Walls, different tiles etc
-- Tile types
+- Different types of rooms
+- Monsters, enemies
+- Looting
+- Treasures
 - Path finding
-- Creating a game with the dungeon generator
+- Configurable amount of exits/entrances to a room
+- And more!
