@@ -19,24 +19,36 @@ Roguelike.RoomFactory.prototype = {
     *
     * @param {Roguelike.Map} map - The map for which we have to generate rooms
     */
-    generateRooms: function(map){
+    generateRooms: function(game){
 
         //Maximum number of tries before stopping the placement of more rooms
-        var maxTries = map.maxRooms + 10;
+        var maxTries = game.map.maxRooms + 10;
         var tries = 0;
 
         //Create rooms and add them to the list
-        while (map.rooms.length < map.maxRooms) {
+        while (game.map.rooms.length < game.map.maxRooms) {
 
             //Check if the limit has been reached, this prevents the while loop from crashing your page
             //We assume there is no space left on the map and break the loop
             if(tries >= maxTries){ break; }
 
             //Generate random values ( in tiles )
-            var w = Roguelike.Utils.randomNumber(map.minRoomWidth, map.maxRoomWidth);
-            var h = Roguelike.Utils.randomNumber(map.minRoomHeight, map.maxRoomHeight);
-            var x = Roguelike.Utils.randomNumber(1, map.tilesX - w - 1);
-            var y = Roguelike.Utils.randomNumber(1, map.tilesY - h - 1);
+            var w = Roguelike.Utils.randomNumber(
+                game.map.minRoomWidth,
+                game.map.maxRoomWidth
+            );
+            var h = Roguelike.Utils.randomNumber(
+                game.map.minRoomHeight,
+                game.map.maxRoomHeight
+            );
+            var x = Roguelike.Utils.randomNumber(
+                1,
+                game.map.tilesX - w - 1
+            );
+            var y = Roguelike.Utils.randomNumber(
+                1,
+                game.map.tilesY - h - 1
+            );
 
             //Create a new room with these values
             var oRoom = new Roguelike.Room(x, y, w, h);
@@ -45,14 +57,14 @@ Roguelike.RoomFactory.prototype = {
             tries++;
 
             //Check if this room intersects with the other rooms, if not, add it to the list
-            if(!map.roomIntersectsWith(oRoom)){
+            if(!game.map.roomIntersectsWith(oRoom)){
 
                 //The room doesn't intersect, initialize the room layout
                 oRoom.initialize();
                 oRoom.generateExit();
 
                 //Add the room to the room list
-                map.rooms.push(oRoom);
+                game.map.rooms.push(oRoom);
 
                 //Reset tries back to zero, giving the next room equal chances of spawning
                 tries = 0;
