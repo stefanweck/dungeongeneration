@@ -8,22 +8,22 @@
 * @param {int} tileY - The number of vertical tiles on this map
 * @param {int} maxRooms - The maximum number of rooms allowed on this map
 */
-Roguelike.Map = function(tileX, tileY, maxRooms){
+Roguelike.Map = function(game){
 
     /*
     * @property {int} tilesX - The number of horizontal tiles on this map
     */
-    this.tilesX = tileX;
+    this.tilesX = game.settings.tilesX;
 
     /*
     * @property {int} tilesY - The number of vertical tiles on this map
     */
-    this.tilesY = tileY;
+    this.tilesY = game.settings.tilesY;
 
     /*
     * @property {int} maxRooms - The maximum number of rooms allowed on this map
     */
-    this.maxRooms = maxRooms;
+    this.maxRooms = game.settings.maxRooms;
 
     /*
     * @property {array} rooms - An array that holds all room objects
@@ -43,27 +43,27 @@ Roguelike.Map = function(tileX, tileY, maxRooms){
     /*
     * @property {int} tileSize - The width and height of a single tile on the map
     */
-    this.tileSize = 15;
+    this.tileSize = game.settings.tileSize;
 
     /*
     * @property {int} minRoomWidth - The minimum width of a room on this map
     */
-    this.minRoomWidth = 6;
+    this.minRoomWidth = game.settings.minRoomWidth;
 
     /*
     * @property {int} maxRoomWidth - The maximum width of a room on this map
     */
-    this.maxRoomWidth = 12;
+    this.maxRoomWidth = game.settings.maxRoomWidth;
 
     /*
     * @property {int} minRoomHeight - The minimum heigth of a room on this map
     */
-    this.minRoomHeight = 6;
+    this.minRoomHeight = game.settings.minRoomHeight;
 
     /*
     * @property {int} maxRoomHeight - The maximum heigth of a room on this map
     */
-    this.maxRoomHeight = 12;
+    this.maxRoomHeight = game.settings.maxRoomHeight;
 
     /*
     * @property {Roguelike.RoomFactory} roomFactory - The room factory is responsible for creating rooms and corridors on this map
@@ -177,7 +177,7 @@ Roguelike.Map.prototype = {
 
         }
 
-        //Generate the corridors for these rooms
+        //Generate the corridors for these rooms on the current map object
         this.roomFactory.generateCorridors(this);
 
     }
