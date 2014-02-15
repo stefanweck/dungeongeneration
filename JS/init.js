@@ -1,10 +1,3 @@
-//TODO
-//Add default settings, just like jquery's extend options
-
-//Initialize variables
-var oCanvas;
-var oContext;
-
 window.onload = function(){
 
     initializeCanvas();
@@ -14,47 +7,29 @@ window.onload = function(){
 function initializeCanvas(){
 
     //Initialize the canvas
-    oCanvas = document.getElementById("canvas");
-    oContext = oCanvas.getContext("2d");
+    canvas = document.getElementById("canvas");
+    canvas.width = 900;
+    canvas.height = 600;
 
-    //Set the width and height of the canvas
-    oCanvas.width = 900;
-    oCanvas.height = 600;
+    var options = {
+        canvas: canvas, //The canvas object on which our dungeon is placed on
+        tilesX: 60, //The number of horizontal tiles on this map
+        tilesY: 40, //The number of vertical tiles on this map
+        tileSize: 15, //The width and height of a single tile
+        maxRooms: 10, //The maximum number of rooms on this map
+        minRoomWidth: 6, //The minimum width of a single room
+        maxRoomWidth: 12, //The maximum width of a single room
+        minRoomHeight: 6, //The minimum height of a single room
+        maxRoomHeight: 12, //The maximum height of a single room
+        debug: false //Boolean to enable or disable the debugger
+    };
+
+    //Set click event to the canvas
+    canvas.addEventListener('click', function(){
+        game = new Roguelike.Game(options);
+    }, false);
 
     //Create a new game
-    var game = new Roguelike.Game();
-
-    //Initialize the game
-    game.initialize(
-        //Tiles X
-        60,
-        //Tiles Y
-        40,
-        //Maximum number of rooms
-        10
-    );
-
-    //Debug functionality
-    canvas.addEventListener('mousemove', function(e) {
-        var mousePos = Roguelike.Utils.getMousePos(canvas, e);
-        var x = Math.floor(mousePos.x / 15 );
-        var y = Math.floor(mousePos.y / 15 );
-
-        console.clear();
-        game.renderer.draw(game.map);
-        tileType = game.map.tiles[y][x].type;
-
-        console.log(game.map.tiles[y][x]);
-
-        oContext.fillStyle = "rgba(255, 0, 0, 0.2)";
-
-        if(game.map.tiles[y][x].belongsTo){
-            var room = game.map.tiles[y][x].belongsTo;
-            oContext.fillRect(room.x1 * game.map.tileSize, room.y1 * game.map.tileSize , room.w * game.map.tileSize, room.h * game.map.tileSize);
-        }else{
-            oContext.fillRect(x * game.map.tileSize, y * game.map.tileSize , game.map.tileSize, game.map.tileSize);
-        }
-
-    }, false);
+    game = new Roguelike.Game(options);
 
 }
