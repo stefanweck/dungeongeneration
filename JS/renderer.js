@@ -22,22 +22,30 @@ Roguelike.Renderer.prototype = {
     *
     * @param {Roguelike.Map} map - The map that is going to be drawn onto the canvas
     */
-    draw: function(map){
+    draw: function(game){
+
+        //Get the canvas 2D context of the current canvas
+        var context = game.settings.canvas.getContext("2d");
 
         //Loop through every horizontal row
-        for(y = 0; y < map.tilesY; y++){
+        for(y = 0; y < game.map.tilesY; y++){
 
             //Loop through every vertical row
-            for(x = 0; x < map.tilesX; x++){
+            for(x = 0; x < game.map.tilesX; x++){
 
                 //Get the type of the current tile
-                var tileType = map.tiles[y][x].type;
+                var tileType = game.map.tiles[y][x].type;
 
                 //Get the corrosponding color of this tile from the array of colors
-                oContext.fillStyle = this.colors[tileType];
+                context.fillStyle = this.colors[tileType];
 
                 //Create a rectangle!
-                oContext.fillRect(x * map.tileSize, y * map.tileSize, map.tileSize, map.tileSize);
+                context.fillRect(
+                    x * game.map.tileSize,
+                    y * game.map.tileSize,
+                    game.map.tileSize,
+                    game.map.tileSize
+                );
 
             }
 
