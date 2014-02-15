@@ -4,9 +4,10 @@
 * @class Roguelike.game
 * @classdesc The heart of this roguelike game! In here we provide access to
 * all the other objects and function, and we handle the startup of the game
-* 
+*
+* @param {object} userSettings - The settings that the user provides
 */
-Roguelike.Game = function(){
+Roguelike.Game = function(userSettings){
 
     /*
     * @property {bool} isInitialized - Boolean to see if the game is allready initialized
@@ -23,6 +24,28 @@ Roguelike.Game = function(){
     */
    this.renderer = null;
 
+    /*
+    * @property {object} settings - The default settings
+    */
+   this.settings = {
+        canvas: null,
+        tilesX: 60,
+        tilesY: 40,
+        tileSize: 20,
+        maxRooms: 10,
+        minRoomWidth: 6,
+        maxRoomWidth: 12,
+        minRoomHeight: 6,
+        maxRoomHeight: 12,
+        debug: false
+    };
+
+    //Extend the default settings with those of the user
+    this.settings = Roguelike.Utils.extend(this.settings, userSettings);
+
+    //Initialize itself
+    this.initialize();
+
 };
 
 Roguelike.Game.prototype = {
@@ -35,24 +58,29 @@ Roguelike.Game.prototype = {
     * @param {int} tileY - The number of tiles on the Y axis
     * @param {int} maxRooms - The maximum number of rooms in a map
     */
-    initialize: function(tileX, TilexY, maxRooms){
+    initialize: function(){
 
         //Check if the game is allready initialized
         if(this.isInitialized){
             return;
         }
 
+        //Check if the debugged has to be initialized
+        if(this.settings.debug === true){
+            canvas.addEventListener('mousemove', Roguelike.Utils.debugTiles, false);
+        }
+
         //Initialize the map
-        this.map = new Roguelike.Map(tileX, TilexY, maxRooms);
+        this.map = new Roguelike.Map(this);
         this.map.initialize();
 
         //Generate rooms for this map
-        this.map.roomFactory.generateRooms(this.map);
+        this.map.roomFactory.generateRooms(this);
         this.map.addRooms();
 
         //Draw the map on canvas
         this.renderer = new Roguelike.Renderer();
-        this.renderer.draw(this.map);
+        this.renderer.draw(this);
 
     }
 
