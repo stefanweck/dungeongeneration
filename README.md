@@ -1,11 +1,12 @@
-<h1>Roguelike Javascript game with Canvas</h1>
+<h1>Random Dungeon Generation</h1>
 
-A roguelike game i am creating purely in javascript on canvas! 
+A random dungeon generator i am creating purely in javascript on canvas! 
 
 Features:
-- Random Dungeon Generation
+- Random Dungeon Generation ( Suprise! )
 - Corridors between the rooms
 - Random doors at the end of corridors
+- Configurable settings
 
 What's next?
 
