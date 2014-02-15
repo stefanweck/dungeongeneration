@@ -3,7 +3,7 @@
 A random dungeon generator i am creating purely in javascript on canvas! 
 
 Features:
-- Random Dungeon Generation ( Suprise! )
+- Random Dungeon Generation ( Surprise! )
 - Corridors between the rooms
 - Random doors at the end of corridors
 - Configurable settings
