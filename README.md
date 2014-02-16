@@ -21,7 +21,7 @@ What's next?
 <h1>Demo</h1>
 
 You can view a live demo with the current code 
-on GitHub right here: <a title="Live Demo" href=" http://htmlpreview.github.io/?https://github.com/stefanweck/dungeongeneration/blob/master/index.html">Live Demo</a>.
+on GitHub right here: [Live Demo](http://htmlpreview.github.io/?https://github.com/stefanweck/dungeongeneration/blob/master/index.html">Live Demo).
 Note: Clicking the canvas generates a new map!
  
 <h1>Contact</h1>
