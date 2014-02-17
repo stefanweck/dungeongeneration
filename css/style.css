@@ -1,0 +1,9 @@
+body{
+	background-color:#fff;
+}
+
+canvas{
+	margin:0 auto;
+	display:block;
+	margin-top:20px;
+}
