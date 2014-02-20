@@ -12,7 +12,7 @@ Features:
 
 What's next?
 
-- Colission
+- Collision
 - Turns
 - Different types of rooms
 - Monsters, enemies
