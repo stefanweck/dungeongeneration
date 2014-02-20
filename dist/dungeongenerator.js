@@ -1,21 +1,30 @@
-/*! Dungeon Generator - v1.2.0 - 2014-02-17
+/*! Dungeon Generator - v1.5.0 - 2014-02-20
 * https://github.com/stefanweck/dungeongeneration
 * Copyright (c) 2014 Stefan Weck */
 /*
 * Roguelike javascript game with HTML5's canvas
 *
-* v.1.2 - Build on: 12 Feb 2014
+* v.1.5 - Build on: 20 Feb 2014
 *
-* Version 1.2! This version only includes generation rooms, 
-* making sure they don't overlap eachother and corridor generation!
-*
+* Features:
+* - Random Dungeon Generation ( Surprise! )
+* - Corridors between the rooms
+* - Random doors at the end of corridors
+* - A player that can walk through the dungeon
+* - A camera with a viewport
+* - Configurable settings
+* 
 * What's next?
 * 
-* - Configurable amount of exits/entrances to a room
-* - Walls, different tiles etc
-* - Tile types
+* - Colission
+* - Turns
+* - Different types of rooms
+* - Monsters, enemies
+* - Looting
+* - Treasures
 * - Path finding
-* - Creating a game with the dungeon generator
+* - Configurable amount of exits/entrances to a room
+* - And more!
 * 
 */
 
@@ -24,7 +33,7 @@
 */
 var Roguelike = Roguelike || {
 
-    VERSION: '1.2'
+    VERSION: '1.5'
 
 };
 Roguelike.Game = function(userSettings){
@@ -35,9 +44,24 @@ Roguelike.Game = function(userSettings){
     this.isInitialized = false;
 
     /*
+    * @property {Roguelike.Controls} controls - The object that handles user input
+    */
+    this.controls = null;
+
+    /*
     * @property {Roguelike.Map} map - Reference to the current map
     */
     this.map = null;
+
+    /*
+    * @property {Roguelike.Camera} camera - Reference to the camera
+    */
+    this.camera = null;
+
+    /*
+    * @property {Roguelike.Player} player - Reference to the player object
+    */
+    this.player = null;
 
     /*
     * @property {Roguelike.Renderer} map - Reference to the current renderer
@@ -90,6 +114,22 @@ Roguelike.Game.prototype = {
             canvas.addEventListener('mousemove', Roguelike.Utils.debugTiles, false);
         }
 
+        //Set this to the currentgame variable, so all the stupid Event Listeners
+        //and Intervals know what is going on
+        var currentGame = this;
+
+        //Initialize the tracking of the players input
+        this.controls = new Roguelike.Controls();
+
+        function keyDownFunction(e){
+            currentGame.controls.keyDown(e);
+        }
+        function keyUpFunction(e){
+            currentGame.controls.keyUp(e);
+        }
+        window.addEventListener('keydown', keyDownFunction, false);
+        window.addEventListener('keyup', keyUpFunction, false);
+
         //Initialize the map
         this.map = new Roguelike.Map(this);
         this.map.initialize();
@@ -98,14 +138,67 @@ Roguelike.Game.prototype = {
         this.map.roomFactory.generateRooms(this);
         this.map.addRooms();
 
+        //Create the camera object
+        this.camera = new Roguelike.Camera(this, {x: 0, y: 0});
+
+        //Add the player in the mix
+        this.player = new Roguelike.Player(this, {x: 10, y: 10});
+
+        //Let the camera follow the player object
+        this.camera.follow(this.player, this.settings.canvas.width / 2, this.settings.canvas.height / 2);
+
         //Draw the map on canvas
         this.renderer = new Roguelike.Renderer(this);
-        this.renderer.draw(this);
+        this.renderer.drawMap();
+        this.renderer.drawPlayer();
 
-    }
+        //Call the gameloop
+        updateInterval = setInterval(function(){
+            currentGame.update();
+        //TODO: Make this configurable, STEP/(INTERVAL/FPS)
+        }, 1000/(1000/30));
+
+        //The game is fully initialized!
+        this.isInitialized = true;
+
+    },
+
+    /*
+    * All the functions that need to be executed everytime the game updates
+    * Basically the game loop
+    * @protected
+    *
+    */
+    update: function(){
+
+        //Update the player
+        this.player.update();
+
+        //Update the camera
+        this.camera.update();
+
+        //Render the changes
+        this.renderer.update();
+
+    },
 
 };
-Roguelike.Renderer = function(){
+Roguelike.Renderer = function(game){
+
+    /*
+    * @property {Roguelike.Game} game - Reference to the current game object
+    */
+    this.game = game;
+
+    /*
+    * @property {object} canvas - Reference to the canvas object everything is drawn on
+    */
+    this.canvas = game.settings.canvas;
+
+    /*
+    * @property {object} canvas - The 2D context of the current canvas object
+    */
+    this.context = game.settings.canvas.getContext("2d");
 
     /*
     * @property {array} colors - Contains all the default colors for the tiles
@@ -119,37 +212,82 @@ Roguelike.Renderer.prototype = {
     /*
     * Draw the current map onto the canvas
     * @protected
-    *
-    * @param {Roguelike.Map} map - The map that is going to be drawn onto the canvas
     */
-    draw: function(game){
+    drawMap: function(){
 
-        //Get the canvas 2D context of the current canvas
-        var context = game.settings.canvas.getContext("2d");
+        //Save the context to push a copy of our current drawing state onto our drawing state stack
+        this.context.save();
 
         //Loop through every horizontal row
-        for(y = 0; y < game.map.tilesY; y++){
+        for(y = 0; y < this.game.map.tilesY; y++){
 
             //Loop through every vertical row
-            for(x = 0; x < game.map.tilesX; x++){
+            for(x = 0; x < this.game.map.tilesX; x++){
 
                 //Get the type of the current tile
-                var tileType = game.map.tiles[y][x].type;
+                var tileType = this.game.map.tiles[y][x].type;
 
                 //Get the corrosponding color of this tile from the array of colors
-                context.fillStyle = this.colors[tileType];
+                this.context.fillStyle = this.colors[tileType];
 
                 //Create a rectangle!
-                context.fillRect(
-                    x * game.map.tileSize,
-                    y * game.map.tileSize,
-                    game.map.tileSize,
-                    game.map.tileSize
+                this.context.fillRect(
+                    //Get the current position of the tile, and check where it is in the camera's viewport
+                    (x * this.game.map.tileSize) - this.game.camera.position.x,
+                    (y * this.game.map.tileSize) - this.game.camera.position.y,
+                    this.game.map.tileSize,
+                    this.game.map.tileSize
                 );
 
             }
 
         }
+
+        //Pop the last saved drawing state off of the drawing state stack
+        this.context.restore();
+
+    },
+
+    /*
+    * Draw the player onto the canvas
+    * @protected
+    */
+    drawPlayer: function(){
+
+        //Save the context to push a copy of our current drawing state onto our drawing state stack
+        this.context.save();
+
+        //The players color
+        this.context.fillStyle = "#615248";
+
+        //Create the player ( just a rectangle for now )!
+        this.context.fillRect(
+            (this.game.player.position.x * this.game.map.tileSize) - this.game.camera.position.x,
+            (this.game.player.position.y * this.game.map.tileSize) - this.game.camera.position.y,
+            this.game.map.tileSize,
+            this.game.map.tileSize
+        );
+
+        //Pop the last saved drawing state off of the drawing state stack
+        this.context.restore();
+
+    },
+
+    /*
+    * All the functions that need to be executed everytime the game updates
+    * @protected
+    *
+    */
+    update: function(){
+
+        //Clear the entire canvas
+        this.context.clearRect(0, 0, this.game.settings.canvas.width, this.game.settings.canvas.height);
+
+        //Redraw the map
+        this.drawMap();
+
+        //Redraw the player
+        this.drawPlayer();
 
     }
 
@@ -713,7 +851,7 @@ function initializeCanvas(){
         canvas: canvas, //The canvas object on which our dungeon is placed on
         tilesX: 60, //The number of horizontal tiles on this map
         tilesY: 40, //The number of vertical tiles on this map
-        tileSize: 15, //The width and height of a single tile
+        tileSize: 25, //The width and height of a single tile
         maxRooms: 10, //The maximum number of rooms on this map
         minRoomWidth: 6, //The minimum width of a single room
         maxRoomWidth: 12, //The maximum width of a single room
@@ -722,27 +860,7 @@ function initializeCanvas(){
         debug: false //Boolean to enable or disable the debugger
     };
 
-    //Set click event to the canvas
-    canvas.addEventListener('click', function(){
-        game = new Roguelike.Game(options);
-    }, false);
-
     //Create a new game
     game = new Roguelike.Game(options);
-
-    //TODO: Don't make this so ugly
-    document.addEventListener("click", function(){
-
-        game.map = new Roguelike.Map(game);
-        game.map.initialize();
-
-        //Generate rooms for this map
-        game.map.roomFactory.generateRooms(game);
-        game.map.addRooms();
-
-        //Draw the map on canvas
-        game.renderer.draw(game);
-
-    }, false);
 
 }

@@ -6,10 +6,14 @@ Features:
 - Random Dungeon Generation ( Surprise! )
 - Corridors between the rooms
 - Random doors at the end of corridors
+- A player that can walk through the dungeon
+- A camera with a viewport
 - Configurable settings
 
 What's next?
 
+- Colission
+- Turns
 - Different types of rooms
 - Monsters, enemies
 - Looting
