@@ -16,7 +16,20 @@ module.exports = function(grunt) {
         stripBanners: true
       },
       dist: {
-        src: ['lib/roguelike.js', 'lib/game.js', 'lib/renderer.js', 'lib/roomfactory.js', 'lib/tile.js', 'lib/map.js','lib/room.js','lib/utils.js','lib/init.js'],
+        src: ['lib/roguelike.js', 
+            'lib/game.js', 
+            'lib/renderer.js', 
+            'lib/roomfactory.js', 
+            'lib/tile.js', 
+            'lib/player.js', 
+            'lib/controls.js', 
+            'lib/boundary.js', 
+            'lib/camera.js', 
+            'lib/map.js',
+            'lib/room.js',
+            'lib/utils.js',
+            'lib/init.js'
+            ],
         dest: 'dist/<%= pkg.name %>.js'
       }
     },
