@@ -19,7 +19,7 @@ module.exports = function(grunt) {
         src: ['lib/roguelike.js', 
             'lib/game.js', 
             'lib/renderer.js', 
-            'lib/roomfactory.js', 
+            'lib/mapfactory.js', 
             'lib/tile.js', 
             'lib/player.js', 
             'lib/controls.js', 
