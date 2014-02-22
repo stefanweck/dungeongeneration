@@ -20,6 +20,8 @@ module.exports = function(grunt) {
             'lib/game.js', 
             'lib/renderer.js', 
             'lib/mapfactory.js', 
+            'lib/vector2.js', 
+            'lib/lightsource.js', 
             'lib/tile.js', 
             'lib/object.js', 
             'lib/player.js', 
