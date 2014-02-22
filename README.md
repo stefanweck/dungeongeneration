@@ -1,4 +1,4 @@
-<h1>Random Dungeon Generation</h1>
+<h1>Random Dungeon Generation V.1.6.0</h1>
 
 A random dungeon generator i am creating purely in javascript on canvas! 
 
@@ -8,18 +8,19 @@ Features:
 - Random doors at the end of corridors
 - A player that can walk through the dungeon
 - A camera with a viewport
+- Fog of War!
+- Field of view for the player
 - Configurable settings
 
 What's next?
 
-- Collision
 - Turns
+- Interaction with objects, such as doors
 - Different types of rooms
 - Monsters, enemies
 - Looting
 - Treasures
 - Path finding
-- Configurable amount of exits/entrances to a room
 - And more!
 
 <h1>Demo</h1>
@@ -30,7 +31,7 @@ Note: Move the character around with your arrow keys!
  
 <h1>Contact</h1>
 
-Do you have crazy ideas, do you want to contribute or just send 
+Do you have great ideas, do you want to contribute or just send 
 me an email. Reach me by emailing to contact@stefanweck.nl!
 
 <h1>License</h1>

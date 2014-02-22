@@ -1,10 +1,10 @@
-/*! Dungeon Generator - v1.5.0 - 2014-02-21
+/*! Dungeon Generator - v1.6.0 - 2014-02-22
 * https://github.com/stefanweck/dungeongeneration
 * Copyright (c) 2014 Stefan Weck */
 /*
 * Roguelike javascript game with HTML5's canvas
 *
-* v.1.5 - Build on: 20 Feb 2014
+* v.1.6.0 - Build on: 22 Feb 2014
 *
 * Features:
 * - Random Dungeon Generation ( Surprise! )
@@ -12,18 +12,19 @@
 * - Random doors at the end of corridors
 * - A player that can walk through the dungeon
 * - A camera with a viewport
+* - Fog of War!
+* - Field of view for the player
 * - Configurable settings
 * 
 * What's next?
 * 
-* - Collision
 * - Turns
+* - Interaction with objects, such as doors
 * - Different types of rooms
 * - Monsters, enemies
 * - Looting
 * - Treasures
 * - Path finding
-* - Configurable amount of exits/entrances to a room
 * - And more!
 * 
 */
@@ -62,6 +63,11 @@ Roguelike.Game = function(userSettings){
     * @property {Roguelike.Player} player - Reference to the player object
     */
     this.player = null;
+
+    /*
+    * @property {Roguelike.LightSource} lightsource - Reference to lightsource
+    */
+    this.lightSource = null;
 
     /*
     * @property {Roguelike.Renderer} map - Reference to the current renderer
@@ -147,6 +153,15 @@ Roguelike.Game.prototype = {
         //Add the player in the mix
         this.player = new Roguelike.Player(this, this.map.entrance);
 
+        //Add a lightsource at the player's position
+        this.lightSource = new Roguelike.LightSource(
+            this, 
+            {
+                radius: 8,
+                gradient: true
+            }
+        );
+
         //Let the camera follow the player object
         this.camera.follow(this.player, this.settings.canvas.width / 2, this.settings.canvas.height / 2);
 
@@ -176,6 +191,14 @@ Roguelike.Game.prototype = {
 
         //Update the player
         this.player.update();
+
+        //Update the lightsource
+        var newLight = this.lightSource.update(this.player.position.x, this.player.position.y);
+
+        for(var i = 0; i < newLight.length; i++) {
+            this.map.tiles[newLight[i].y][newLight[i].x].lightLevel = newLight[i].lightLevel;
+            this.map.tiles[newLight[i].y][newLight[i].x].explored = true;
+        }
 
         //Update the camera
         this.camera.update();
@@ -237,6 +260,26 @@ Roguelike.Renderer.prototype = {
 
                 //Get the corrosponding color of this tile from the array of colors
                 this.context.fillStyle = this.tileColors[tileType];
+
+                //Create a rectangle!
+                this.context.fillRect(
+                    //Get the current position of the tile, and check where it is in the camera's viewport
+                    (x * this.game.map.tileSize) - this.game.camera.position.x,
+                    (y * this.game.map.tileSize) - this.game.camera.position.y,
+                    this.game.map.tileSize,
+                    this.game.map.tileSize
+                );
+
+                //Draw the lightmap
+                if(this.game.map.tiles[y][x].explored === true && 1 - this.game.map.tiles[y][x].lightLevel > 0.7){
+
+                    this.context.fillStyle = "rgba(0, 0, 0, 0.7)";
+
+                }else{
+
+                    this.context.fillStyle = "rgba(0, 0, 0, "+(1 - this.game.map.tiles[y][x].lightLevel)+")";
+
+                }
 
                 //Create a rectangle!
                 this.context.fillRect(
@@ -498,7 +541,12 @@ Roguelike.MapFactory.prototype = {
     generateHorizontalCorridor: function(x, y){
 
         //Check if if there is a wall where we place this corridor, and have a random chance to spawn a door
-        if(this.game.map.tiles[y][x].type === 1 && this.game.map.tiles[y + 1][x].type !== 2 && this.game.map.tiles[y - 1][x].type !== 2 && Roguelike.Utils.randomNumber(1, 100) > 70){
+        var currentTileType = this.game.map.tiles[y][x].type;
+        var aboveTileType = this.game.map.tiles[y + 1][x].type;
+        var belowTileType = this.game.map.tiles[y - 1][x].type;
+        var randomChance = Roguelike.Utils.randomNumber(1, 100);
+
+        if(currentTileType === 1 && aboveTileType === 1 && belowTileType === 1 && randomChance > 60){
             
             //Create the door object
             var doorObject = new Roguelike.Object(
@@ -512,21 +560,33 @@ Roguelike.MapFactory.prototype = {
             //Add this object to the list
             this.game.map.objects.push(doorObject);
 
-            console.log(this.game.map.objects);
+            //Add this static object to the tile object
+            this.game.map.tiles[y][x].staticObject = doorObject;
+            this.game.map.tiles[y][x].blockLight = true;
 
         }
         
         //Place a floor tile
-        this.game.map.tiles[y][x].type = 2;
-        
+        if(this.game.map.tiles[y + 1][x].staticObject !== null){
+            this.game.map.tiles[y][x].type = 1;
+        }else if(this.game.map.tiles[y - 1][x].staticObject !== null){
+            this.game.map.tiles[y][x].type = 1;
+        }else{
+            this.game.map.tiles[y][x].type = 2;
+
+            //Only set block light to false if there isn't a door at this position
+            if(this.game.map.tiles[y][x].staticObject === null){
+                this.game.map.tiles[y][x].blockLight = false; 
+            }
+        }
 
         //Generate walls below this hallway
-        if(this.game.map.tiles[y + 1][x].type === 0 || this.game.map.tiles[y + 1][x].type === 3){
+        if(this.game.map.tiles[y + 1][x].type === 0){
             this.game.map.tiles[y + 1][x].type = 1;
         }
 
         //Generate walls above this hallway
-        if(this.game.map.tiles[y - 1][x].type === 0 || this.game.map.tiles[y - 1][x].type === 3){
+        if(this.game.map.tiles[y - 1][x].type === 0){
             this.game.map.tiles[y - 1][x].type = 1;
         }
 
@@ -541,8 +601,22 @@ Roguelike.MapFactory.prototype = {
     */
     generateVerticalCorridor: function(prevx, y){
 
+        //If there is a door on our path, we simply remove it! Bye!
+        //TODO: Check if the object is indeed a door, not only an object
+        if(this.game.map.tiles[y][prevx].staticObject !== null){
+
+            //Get the position of the door
+            var index = this.game.map.objects.indexOf(this.game.map.tiles[y][prevx].staticObject);
+
+            //Remove the object from the tile and the array
+            this.game.map.objects.splice(index, 1);
+            this.game.map.tiles[y][prevx].staticObject = null;
+
+        }
+
         //Set the current tile to floor
         this.game.map.tiles[y][prevx].type = 2;
+        this.game.map.tiles[y][prevx].blockLight = false; 
 
         //Generate walls right from this hallway
         if(this.game.map.tiles[y][prevx + 1].type === 0){
@@ -575,7 +649,266 @@ Roguelike.MapFactory.prototype = {
     }
 
 };
-Roguelike.Tile = function(type, room){
+Roguelike.Vector2 = function(x, y){
+
+    /*
+    * @property {int} x - The x coordinate of this vector2 object
+    */
+    this.x = x;
+
+    /*
+    * @property {int} x - The y coordinate of this vector2 object
+    */
+    this.y = y;
+
+};
+
+Roguelike.Vector2.prototype = {
+
+    /*
+    * Add another vector2 object
+    * @protected
+    *
+    * @param {Roguelike.Vector2} other - The y other vector2 object
+    */
+    add: function(other){
+
+        var dx = pos.x - this.x;
+        var dy = pos.y - this.y;
+        
+        return Math.abs(Math.sqrt((dx * dx) + (dy * dy)));
+
+    },
+
+    /*
+    * Distance to another Vector2 Object
+    * @protected
+    *
+    * @param {object} pos - The position of the other object
+    */
+    distance: function(pos) {
+        var dx = pos.x - this.x;
+        var dy = pos.y - this.y;
+        
+        return Math.abs(Math.sqrt((dx * dx) + (dy * dy)));
+    },
+    
+    /*
+    * Manhattan distance to another object
+    * @protected
+    *
+    * @param {object} pos - The position of the other object
+    */
+    manhattan: function(pos) {
+        return(Math.abs(this.x - pos.x) + Math.abs(this.y - pos.y));
+    },
+    
+    /*
+    * Clone the current Vector2 Object
+    * @protected
+    */
+    clone: function() {
+        return(new Vector2(this.x, this.y));
+    },
+    
+    /*
+    * Create a string from this Vector2 Object
+    * @protected
+    */
+    toString: function() {
+        return("(" + this.x + ", " + this.y + ")");
+    }
+
+};
+Roguelike.LightSource = function(game, options){
+
+    /*
+    * @property {Roguelike.Game} game - Reference to the current game object
+    */
+    this.game = game;
+
+    /*
+    * @property {bool} gradient - Should the lightmap be drawn with a gradient
+    */
+    this.gradient = options.gradient;
+
+    /*
+    * @property {object} mapSize - The size of the current map
+    */
+    this.mapSize = {x: game.map.tilesX, y: game.map.tilesY};
+
+    /*
+    * @property {object} tiles - Object that is being used to store tile data before returning it
+    */
+    this.tiles = [];
+
+    /*
+    * @property {object} position - The current position of the light source
+    */
+    this.position = new Roguelike.Vector2(-1, -1);
+
+    /*
+    * @property {int} radius - The radius of the light, how far does it shine it's magical light!
+    */
+    this.radius = options.radius;
+
+    /*
+    * @property {object} oldRadius
+    */
+    this.oldRadius = options.radius;
+    
+    /*
+    * @property {array} mult - Multipliers for transforming coordinates into other octants
+    */
+    this.mult = [
+        [1,  0,  0, -1, -1,  0,  0,  1],
+        [0,  1, -1,  0,  0, -1,  1,  0],
+        [0,  1,  1,  0,  0, -1, -1,  0],
+        [1,  0,  0,  1, -1,  0,  0, -1]
+    ];
+                    
+
+};
+
+Roguelike.LightSource.prototype = {
+
+    /*
+    * Function that checks if a tile blocks light or not
+    * @protected
+    * 
+    * @param {int} x - The X position of the tile
+    * @param {int} y - The Y position of the tile
+    */
+    doesTileBlock: function(x, y){
+        return this.game.map.tiles[y][x].blockLight;
+    },
+
+    /*
+    * Calculates an octant. Called by the this.calculate when calculating lighting
+    * @protected
+    */
+    calculateOctant: function(cx, cy, row, start, end, radius, xx, xy, yx, yy, id) {
+        this.tiles.push({
+            x: cx,
+            y: cy,
+            lightLevel: 0
+        });
+        
+        var new_start = 0;  
+        
+        if(start < end) return;
+        
+        var radius_squared = radius * radius;       
+    
+        for(var i = row; i<radius+1; i++) {
+            var dx = -i-1;
+            var dy = -i;
+            
+            var blocked = false;
+            
+            while(dx <= 0) {
+    
+                dx += 1;
+                
+                var X = cx + dx * xx + dy * xy;
+                var Y = cy + dx * yx + dy * yy;
+                
+                if(X < this.mapSize.x && X >= 0 && Y < this.mapSize.y && Y >=0) {
+                
+                    var l_slope = (dx-0.5)/(dy+0.5);
+                    var r_slope = (dx+0.5)/(dy-0.5);
+                    
+                    if(start < r_slope) {
+                        continue;
+                    } else if( end > l_slope) {
+                        break;
+                    } else {
+                        if(dx*dx + dy*dy < radius_squared) {
+                            var pos1 = new Roguelike.Vector2(X, Y);
+                            var pos2 = this.position;
+                            var d = (pos1.x - pos2.x) * (pos1.x - pos2.x) + (pos1.y - pos2.y) * (pos1.y - pos2.y);
+
+                            this.tiles.push({
+                                x: X, 
+                                y: Y, 
+                                lightLevel: (this.gradient === false) ? 1 : (1 - (d / (this.radius * this.radius)))
+                            });
+                        } 
+                        
+                        if(blocked) {
+                            if(this.doesTileBlock(X, Y)) {
+                                new_start = r_slope;
+                                continue;
+                            } else {
+                                blocked = false;
+                                start = new_start;
+                            }
+                        } else {
+                            if(this.doesTileBlock(X, Y) && i < radius) {
+                                blocked = true;
+                                this.calculateOctant(cx, cy, i+1, start, l_slope, this.radius, xx, xy, yx, yy, id+1);
+                                
+                                new_start = r_slope;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if(blocked) break;
+        }
+    },
+    
+    /*
+    * Sets flag lit to false on all tiles within radius of position specified
+    * @protected
+    */
+    clear: function () {
+        var i = this.tiles.length; 
+        while(i--) {
+            this.tiles[i].lightLevel = 0;
+        }
+
+        var o = this.tiles;
+        this.tiles = [];
+        return o;
+    },
+    
+    /*
+    * Calculate the new lightning from this lightsource
+    * @protected
+    */
+    calculate: function () {
+        for(var i = 0; i<8; i++) {
+            this.calculateOctant(this.position.x, this.position.y, 1, 1.0, 0.0, this.radius, 
+                this.mult[0][i], this.mult[1][i], this.mult[2][i], this.mult[3][i], 0);
+        }
+
+        //Push this tile and it's light level's in the tiles array
+        this.tiles.push({
+            x: this.position.x,
+            y: this.position.y,
+            lightLevel: 1
+        });
+
+        //Return the tiles
+        return this.tiles;
+    },
+        
+    /*
+    * Update the position of the lightsource and calculate light again
+    * @protected
+    * 
+    * @param {int} x - The X position of the lightsource
+    * @param {int} y - The Y position of the lightsource
+    */
+    update: function(x, y) {
+        this.position = new Roguelike.Vector2(x, y);
+        return this.clear().concat(this.calculate());
+    }
+
+};
+Roguelike.Tile = function(type, blockLight, room){
 
     /*
     * @property {int} The kind of tile, wall, floor, void etc
@@ -585,7 +918,31 @@ Roguelike.Tile = function(type, room){
     /*
     * @property {Roguelike.Room} belongsTo - The room that this tile belongs to
     */
-    this.belongsTo = room;
+    this.belongsTo = room || null;
+
+    /*
+    * @property {Roguelike.Object} staticObject - A static object that is on this tile
+    */
+	this.staticObject = null;
+
+    /*
+    * @property {bool} staticObject - A static object that is on this tile
+    */
+    this.blockLight = blockLight;
+
+    /*
+    * @property {int} lightLevel - The brightness of the current tile
+    */
+    this.lightLevel = 0;
+
+    /*
+    * @property {bool} explored - Boolean if a tile has allready been explorer by the player
+    */
+    this.explored = false;
+
+};
+
+Roguelike.Tile.prototype = {
 
 };
 Roguelike.Object = function(position, type){
@@ -1124,8 +1481,8 @@ Roguelike.Map.prototype = {
             //Loop through every vertical row
             for(x = 0; x < this.tilesX; x++){
 
-                //Initialize this position by setting it to zero
-                this.tiles[y][x] = new Roguelike.Tile(0);
+                //Initialize this position by setting it to zero, and blocking light
+                this.tiles[y][x] = new Roguelike.Tile(0, true);
 
             }
 
@@ -1259,9 +1616,9 @@ Roguelike.Room.prototype = {
 
                 //Check if the position filled has to be a wall or floor
                 if(y === 0 || y === this.h - 1 || x === 0 || x === this.w - 1){
-                    this.layout[y][x] = new Roguelike.Tile(1, this);
+                    this.layout[y][x] = new Roguelike.Tile(1, true, this);
                 }else{
-                    this.layout[y][x] = new Roguelike.Tile(2, this);
+                    this.layout[y][x] = new Roguelike.Tile(2, false, this);
                 }
 
             }
