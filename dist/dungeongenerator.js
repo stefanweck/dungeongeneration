@@ -1,4 +1,4 @@
-/*! Dungeon Generator - v1.6.0 - 2014-02-22
+/*! Dungeon Generator - v1.6.0 - 2014-02-25
 * https://github.com/stefanweck/dungeongeneration
 * Copyright (c) 2014 Stefan Weck */
 /*
@@ -34,7 +34,7 @@
 */
 var Roguelike = Roguelike || {
 
-    VERSION: '1.5'
+    VERSION: '1.6'
 
 };
 Roguelike.Game = function(userSettings){
@@ -129,6 +129,7 @@ Roguelike.Game.prototype = {
 
         function keyDownFunction(e){
             currentGame.controls.keyDown(e);
+            currentGame.player.move();
         }
         function keyUpFunction(e){
             currentGame.controls.keyUp(e);
@@ -170,11 +171,8 @@ Roguelike.Game.prototype = {
         this.renderer.drawMap();
         this.renderer.drawPlayer();
 
-        //Call the gameloop
-        updateInterval = setInterval(function(){
-            currentGame.update();
-        //TODO: Make this configurable, STEP/(INTERVAL/FPS)
-        }, 1000/(1000/30));
+        //Update the game for the first time
+        currentGame.update();
 
         //The game is fully initialized!
         this.isInitialized = true;
@@ -185,16 +183,16 @@ Roguelike.Game.prototype = {
     * All the functions that need to be executed everytime the game updates
     * Basically the game loop
     * @protected
-    *
     */
     update: function(){
 
         //Update the player
-        this.player.update();
+        //this.player.update();
 
         //Update the lightsource
         var newLight = this.lightSource.update(this.player.position.x, this.player.position.y);
 
+        //Update the tiles on the map with the new lightlevels
         for(var i = 0; i < newLight.length; i++) {
             this.map.tiles[newLight[i].y][newLight[i].x].lightLevel = newLight[i].lightLevel;
             this.map.tiles[newLight[i].y][newLight[i].x].explored = true;
@@ -374,6 +372,765 @@ Roguelike.Renderer.prototype = {
 
         //Redraw the player
         this.drawPlayer();
+
+    }
+
+};
+Roguelike.Utils = {
+
+	/*
+	* Function to generate a random number between two values
+	* @param {int} from - The minimum number
+	* @param {int} to - The maximum number
+	*/
+	randomNumber: function(from,to){
+
+		return Math.floor(Math.random()*(to-from+1)+from);
+
+	},
+
+	/*
+	* Function to extend the default options with the users options
+	* @param {object} a - The original object to extend
+	* @param {object} b - The new settings that override the original object
+	*/
+	extend: function(a, b){
+		for(var key in b)
+			if(b.hasOwnProperty(key))
+				a[key] = b[key];
+		return a;
+	},
+
+	/*
+	* Function to return the mouse position on a canvas object
+	* @param {object} canvas - The canvas object to track
+	* @param {object} event - Mouse event
+	*/
+	getMousePos: function(e) {
+		var rect = canvas.getBoundingClientRect();
+		return{
+			x: e.clientX - rect.left,
+			y: e.clientY - rect.top
+		};
+	},
+
+	/*
+	* Draw a red square on the current tile or room, console log the tile information
+	* @param {object} canvas - The canvas object to track
+	* @param {object} event - Mouse event
+	*/
+	debugTiles: function(e) {
+
+		var mousePos = Roguelike.Utils.getMousePos(e);
+		var x = Math.floor(mousePos.x / 15 );
+		var y = Math.floor(mousePos.y / 15 );
+
+		console.clear();
+		game.renderer.draw(game.map);
+		tileType = game.map.tiles[y][x].type;
+
+		console.log(game.map.tiles[y][x]);
+
+		oContext.fillStyle = "rgba(255, 0, 0, 0.2)";
+
+		if(game.map.tiles[y][x].belongsTo){
+			var room = game.map.tiles[y][x].belongsTo;
+			oContext.fillRect(room.x1 * game.map.tileSize, room.y1 * game.map.tileSize , room.w * game.map.tileSize, room.h * game.map.tileSize);
+		}else{
+			oContext.fillRect(x * game.map.tileSize, y * game.map.tileSize , game.map.tileSize, game.map.tileSize);
+		}
+
+	}
+
+};
+Roguelike.Camera = function(game, position){
+
+    /*
+    * @property {Roguelike.Game} game - Reference to the current game object
+    */
+    this.game = game;
+
+    /*
+    * @property {object} position - The x and y top left coordinates of this camera, in pixels
+    */
+    this.position = position;
+
+    /*
+    * @property {int} viewportWidth - The width of the game's canvas, in pixels
+    */
+    this.viewportWidth = game.settings.canvas.width;
+
+    /*
+    * @property {int} viewportHeight - The height of the game's canvas, in pixels
+    */
+    this.viewportHeight = game.settings.canvas.height;
+
+    /*
+    * @property {int} minimumDistanceX - The minimal distance from horizontal borders before the camera starts to move, in pixels
+    */
+    this.minimumDistanceX = 0;
+
+    /*
+    * @property {int} minimumDistanceY - The minimal distance from vertical borders before the camera starts to move, in pixels
+    */
+    this.minimumDistanceY = 0;
+
+    /*
+    * @property {object} followObject - The object that should be followed by the camera
+    */
+    this.followObject = null;
+
+    /*
+    * @property {Roguelike.Boundary} viewportBoundary - The boundary that represents the viewport
+    */
+    this.viewportBoundary = new Roguelike.Boundary(
+        this.position.x * game.settings.tileSize,
+        this.position.y * game.settings.tileSize,
+        this.viewportWidth,
+        this.viewportHeight
+    );
+
+    /*
+    * @property {Roguelike.Boundary} mapBoundary - The boundary that represents the viewport
+    */
+    this.mapBoundary = new Roguelike.Boundary(
+        0,
+        0,
+        game.settings.tilesX * game.settings.tileSize,
+        game.settings.tilesY * game.settings.tileSize
+    );
+
+};
+
+Roguelike.Camera.prototype = {
+
+    /*
+    * Function to call when you want to follow a specific object
+    * @protected
+    *
+    * @param {object} followObject - The object that should be followed by the camera
+    * @param {int} minimumDistanceX - The minimal distance from horizontal borders before the camera starts to move
+    * @param {int} minimumDistanceY - The minimal distance from vertical borders before the camera starts to move
+    */
+    follow: function(followObject, minimumDistanceX, minimumDistanceY){
+
+        //Set the follow object to be the object that's passed along
+        //Object needs to have a position variable, containing an
+        //X and an Y value, in tiles
+        this.followObject = followObject;
+        this.minimumDistanceX = minimumDistanceX;
+        this.minimumDistanceY = minimumDistanceY;
+
+    },
+
+    /*
+    * Function to update the camera to a new position, for example following an object
+    * @protected
+    */
+    update: function(){
+
+        //Check if the camera even has to move
+        if(this.followObject !== null){
+
+            //Move the camera horizontal first
+            if((this.followObject.position.x * this.game.settings.tileSize) - this.position.x  + this.minimumDistanceX > this.viewportWidth){
+
+                //Set the new horizontal position for the camera
+                this.position.x = (this.followObject.position.x * this.game.settings.tileSize) - (this.viewportWidth - this.minimumDistanceX);
+
+            }else if((this.followObject.position.x * this.game.settings.tileSize) - this.minimumDistanceX < this.position.x){
+
+                //Set the new horizontal position for the camera
+                this.position.x = (this.followObject.position.x * this.game.settings.tileSize)  - this.minimumDistanceX;
+
+            }
+
+            //Then move the camera vertical
+            if((this.followObject.position.y * this.game.settings.tileSize) - this.position.y  + this.minimumDistanceY > this.viewportHeight){
+
+                //Set the new vertical position for the camera
+                this.position.y = (this.followObject.position.y * this.game.settings.tileSize) - (this.viewportHeight - this.minimumDistanceY);
+
+            }else if((this.followObject.position.y * this.game.settings.tileSize)  - this.minimumDistanceY < this.position.y){
+
+                //Set the new vertical position for the camera
+                this.position.y = (this.followObject.position.y * this.game.settings.tileSize) - this.minimumDistanceY;
+
+            }
+
+        }
+
+        //Now we update our viewport's boundaries
+        this.viewportBoundary.set(this.position.x, this.position.y);
+
+        //We don't want the camera leaving the world's boundaries, for obvious reasons
+        if(!this.viewportBoundary.isWithin(this.mapBoundary)){
+
+            //Left
+            if(this.viewportBoundary.left < this.mapBoundary.left){
+                this.position.x = this.mapBoundary.left;
+            }
+
+            //Top
+            if(this.viewportBoundary.top < this.mapBoundary.top){               
+                this.position.y = this.mapBoundary.top;
+            }
+
+            //Right
+            if(this.viewportBoundary.right > this.mapBoundary.right){
+                this.position.x = this.mapBoundary.right - this.viewportWidth;
+            }
+
+            //Bottom
+            if(this.viewportBoundary.bottom > this.mapBoundary.bottom){
+                this.position.y = this.mapBoundary.bottom - this.viewportHeight;
+            }
+
+        }
+
+    }
+
+};
+Roguelike.Vector2 = function(x, y){
+
+    /*
+    * @property {int} x - The x coordinate of this vector2 object
+    */
+    this.x = x;
+
+    /*
+    * @property {int} x - The y coordinate of this vector2 object
+    */
+    this.y = y;
+
+};
+
+Roguelike.Vector2.prototype = {
+
+    /*
+    * Add another vector2 object
+    * @protected
+    *
+    * @param {Roguelike.Vector2} other - The y other vector2 object
+    */
+    add: function(other){
+
+        var dx = pos.x - this.x;
+        var dy = pos.y - this.y;
+        
+        return Math.abs(Math.sqrt((dx * dx) + (dy * dy)));
+
+    },
+
+    /*
+    * Distance to another Vector2 Object
+    * @protected
+    *
+    * @param {object} pos - The position of the other object
+    */
+    distance: function(pos) {
+        var dx = pos.x - this.x;
+        var dy = pos.y - this.y;
+        
+        return Math.abs(Math.sqrt((dx * dx) + (dy * dy)));
+    },
+    
+    /*
+    * Manhattan distance to another object
+    * @protected
+    *
+    * @param {object} pos - The position of the other object
+    */
+    manhattan: function(pos) {
+        return(Math.abs(this.x - pos.x) + Math.abs(this.y - pos.y));
+    },
+    
+    /*
+    * Clone the current Vector2 Object
+    * @protected
+    */
+    clone: function() {
+        return(new Vector2(this.x, this.y));
+    },
+    
+    /*
+    * Create a string from this Vector2 Object
+    * @protected
+    */
+    toString: function() {
+        return("(" + this.x + ", " + this.y + ")");
+    }
+
+};
+Roguelike.Boundary = function(left, top, width, height){
+
+    /*
+    * @property {int} left - The left position of this boundary, in pixels
+    */
+    this.left = left || 0;
+
+    /*
+    * @property {int} top - The top position of this boundary, in pixels
+    */
+    this.top = top || 0;
+
+    /*
+    * @property {int} width - The width of this boundary, in pixels
+    */
+    this.width = width || 0;
+
+    /*
+    * @property {int} height - The height of this boundary, in pixels
+    */
+    this.height = height || 0;
+
+    /*
+    * @property {int} right - The right position of this boundary, in pixels
+    */
+    this.right = (this.left + this.width);
+
+    /*
+    * @property {int} bottom - The bottom position of this boundary, in pixels
+    */
+    this.bottom = (this.top + this.height);
+
+};
+
+Roguelike.Boundary.prototype = {
+
+    /*
+    * Function that allows the user to set new values for the boundary
+    * @protected
+    *
+    * @param {int} left - The left position of this boundary, in pixels
+    * @param {int} top - The top position of this boundary, in pixels
+    * @param {int} width - Optional: The width of this boundary, in pixels
+    * @param {int} height - Optional: The height of this boundary, in pixels
+    */
+    set: function(left, top, width, height){
+
+        this.left = left;
+        this.top = top;
+        this.width = width || this.width;
+        this.height = height || this.height;
+        this.right = (this.left + this.width);
+        this.bottom = (this.top + this.height);
+
+    },
+
+    /*
+    * Function to check if one boundary is still inside another boundary
+    * @protected
+    *
+    * @param {Roguelike.Boundary} boundary - The boundary to check against
+    */
+    isWithin: function(boundary){
+
+        return(
+            boundary.left <= this.left && 
+            boundary.right >= this.right &&
+            boundary.top <= this.top && 
+            boundary.bottom >= this.bottom
+        );
+
+    },
+
+    /*
+    * Function to check if one boundary overlaps another boundary
+    * @protected
+    *
+    * @param {Roguelike.Boundary} boundary - The boundary to check against
+    */
+    isOverlapping: function(boundary){
+
+        return(
+            this.left < boundary.right && 
+            boundary.left < this.right && 
+            this.top < boundary.bottom &&
+            boundary.top < this.bottom
+        );
+
+    }
+
+};
+Roguelike.Object = function(position, type){
+
+    /*
+    * @property {object} position - The x and y coordinate of this object, in tiles
+    */
+    this.position = position;
+
+    /*
+    * @property {int} type - The number on the tileset that this object looks like
+    */
+    this.type = type;
+
+};
+
+Roguelike.Object.prototype = {
+
+    
+
+};
+Roguelike.Player = function(game, position){
+
+    /*
+    * @property {Roguelike.Game} game - Reference to the current game object
+    */
+    this.game = game;
+
+    /*
+    * @property {object} position - The x and y coordinate of this player, in tiles
+    */
+    this.position = Object.create(position);
+
+    /*
+    * @property {int} speed - The speed of the player, in tiles
+    */
+    this.speed = 1;
+
+};
+
+Roguelike.Player.prototype = {
+
+    /*
+    * The function that get's called on a keypress
+    * @protected
+    */
+    move: function(){
+
+        //Check which controls are being pressed and update the player accordingly
+        if(this.game.controls.left && this.game.map.tiles[this.position.y][this.position.x - this.speed].type === 2){
+            this.position.x -= this.speed;
+        }else if(this.game.controls.up && this.game.map.tiles[this.position.y - this.speed][this.position.x].type === 2){
+            this.position.y -= this.speed;
+        }else if(this.game.controls.right && this.game.map.tiles[this.position.y][this.position.x + this.speed].type === 2){
+            this.position.x += this.speed;
+        }else if(this.game.controls.down && this.game.map.tiles[this.position.y + this.speed][this.position.x].type === 2){
+            this.position.y += this.speed;
+        }
+
+        //Update the game when the player moves
+        this.game.update();
+
+    }
+
+};
+Roguelike.Controls = function(){
+
+    /*
+    * @property {bool} left - The left key on the keyboard, pressed or not
+    */
+    this.left = false;
+
+    /*
+    * @property {bool} right - The right key on the keyboard, pressed or not
+    */
+    this.right = false;
+
+    /*
+    * @property {bool} up - The up key on the keyboard, pressed or not
+    */
+    this.up = false;
+
+    /*
+    * @property {bool} down - The down key on the keyboard, pressed or not
+    */
+    this.down = false;
+
+};
+
+Roguelike.Controls.prototype = {
+
+    /*
+    * Function that handles keydown events
+    * @protected
+    *
+    * @param {Event Object} e - The event object from the keypress
+    */
+    keyDown: function(e){
+
+        switch(e.keyCode){
+
+            //Left arrow - A
+            case 37: case 65:
+
+                //Left key
+                this.left = true;
+                break;
+
+            //Up arrow - W
+            case 38: case 87:
+
+                //Up key
+                this.up = true;
+                break;
+
+            //Right arrow - D
+            case 39: case 68:
+
+                //Right key
+                this.right = true;
+                break;
+
+            //Down arrow - S
+            case 40: case 83:
+
+                //Down key
+                this.down = true;
+                break;
+
+        }
+
+    },
+
+    /*
+    * Function that handles keyup events
+    * @protected
+    *
+    * @param {Event Object} e - The event object from the keypress
+    */
+    keyUp: function(e){
+
+        switch(e.keyCode){
+
+            //Left arrow - A
+            case 37: case 65:
+
+                //Left key
+                this.left = false;
+                break;
+
+            //Up arrow - W
+            case 38: case 87:
+
+                //Up key
+                this.up = false;
+                break;
+
+            //Right arrow - D
+            case 39: case 68:
+
+                //Right key
+                this.right = false;
+                break;
+
+            //Down arrow - S
+            case 40: case 83:
+
+                //Down key
+                this.down = false;
+                break;
+
+        }
+
+    }
+
+};
+Roguelike.Tile = function(type, blockLight, room){
+
+    /*
+    * @property {int} The kind of tile, wall, floor, void etc
+    */
+    this.type = type;
+
+    /*
+    * @property {Roguelike.Room} belongsTo - The room that this tile belongs to
+    */
+    this.belongsTo = room || null;
+
+    /*
+    * @property {Roguelike.Object} staticObject - A static object that is on this tile
+    */
+	this.staticObject = null;
+
+    /*
+    * @property {bool} staticObject - A static object that is on this tile
+    */
+    this.blockLight = blockLight;
+
+    /*
+    * @property {int} lightLevel - The brightness of the current tile
+    */
+    this.lightLevel = 0;
+
+    /*
+    * @property {bool} explored - Boolean if a tile has allready been explorer by the player
+    */
+    this.explored = false;
+
+};
+
+Roguelike.Tile.prototype = {
+
+};
+Roguelike.Map = function(game){
+
+    /*
+    * @property {Roguelike.Game} game - Reference to the current game object
+    */
+    this.game = game;
+
+    /*
+    * @property {int} tilesX - The number of horizontal tiles on this map
+    */
+    this.tilesX = game.settings.tilesX;
+
+    /*
+    * @property {int} tilesY - The number of vertical tiles on this map
+    */
+    this.tilesY = game.settings.tilesY;
+
+    /*
+    * @property {int} maxRooms - The maximum number of rooms allowed on this map
+    */
+    this.maxRooms = game.settings.maxRooms;
+
+    /*
+    * @property {array} rooms - An array that holds all room objects
+    */
+    this.rooms = [];
+
+    /*
+    * @property {array} corridors - An array that holds all corridor objects
+    */
+    this.corridors = [];
+
+    /*
+    * @property {array} tiles - An array that holds all tile objects
+    */
+    this.tiles = [];
+
+    /*
+    * @property {array} objects - An array that holds all objects that are on the map
+    */
+    this.objects = [];
+
+    /*
+    * @property {int} tileSize - The width and height of a single tile on the map
+    */
+    this.tileSize = game.settings.tileSize;
+
+    /*
+    * @property {int} minRoomWidth - The minimum width of a room on this map
+    */
+    this.minRoomWidth = game.settings.minRoomWidth;
+
+    /*
+    * @property {int} maxRoomWidth - The maximum width of a room on this map
+    */
+    this.maxRoomWidth = game.settings.maxRoomWidth;
+
+    /*
+    * @property {int} minRoomHeight - The minimum heigth of a room on this map
+    */
+    this.minRoomHeight = game.settings.minRoomHeight;
+
+    /*
+    * @property {int} maxRoomHeight - The maximum heigth of a room on this map
+    */
+    this.maxRoomHeight = game.settings.maxRoomHeight;
+
+    /*
+    * @property {Roguelike.MapFactory} mapFactory - The room factory is responsible for creating rooms and corridors on this map
+    */
+    this.mapFactory = null;
+
+    /*
+    * @property {entrance} object - An object that holds the position of the entrance of this map
+    */
+    this.entrance = null;
+
+};
+
+Roguelike.Map.prototype = {
+
+    /*
+    * Initialize the layout of the map, filling it with empty tiles
+    * @protected
+    */
+    initialize: function(){
+
+        //Create the map factory
+        this.mapFactory = new Roguelike.MapFactory(this.game);
+
+        //Loop through every horizontal row
+        for(y = 0; y < this.tilesY; y++){
+
+            //Initialize this row
+            this.tiles[y] = [];
+
+            //Loop through every vertical row
+            for(x = 0; x < this.tilesX; x++){
+
+                //Initialize this position by setting it to zero, and blocking light
+                this.tiles[y][x] = new Roguelike.Tile(0, true);
+
+            }
+
+        }
+
+    },
+
+    /*
+    * Check if a single room overlaps a room that is allready on the map
+    * @protected
+    *
+    * @param {Roguelike.Room} room - The room object that has to be checked
+    */
+    roomIntersectsWith: function(room){
+
+        //Loop through every room in the list
+        for (var i = 0; i < this.rooms.length; i++) {
+
+            //Check if the room intersects with the current room
+            if(room.x1 <= this.rooms[i].x2 && room.x2 >= this.rooms[i].x1 && room.y1 <= this.rooms[i].y2 && room.y2 >= this.rooms[i].y1){
+                return true;
+            }
+
+        }
+        //If the room doesn't intersect another room, return false
+        return false;
+
+    },
+
+    /*
+    * Add all the rooms from the room list to the map, get the tiles from each room's layout
+    * @protected
+    *
+    * @param {Roguelike.Room} room - The room object that has to be checked
+    */
+    addRooms: function(){
+
+        //Loop through each room in the list
+        for (var i = 0; i < this.rooms.length; i++) {
+
+            //Loop through every horizontal row
+            for(y = this.rooms[i].y1; y < this.rooms[i].y2; y++){
+
+                //What is the current Y position in the layout of the current room
+                var layoutYPos = this.rooms[i].y2 - y - 1;
+
+                //Loop through every vertical row
+                for(x = this.rooms[i].x1; x < this.rooms[i].x2; x++){
+
+                    //What is the current X position in the layout of the current room
+                    var layoutXPos = this.rooms[i].x2 - x - 1;
+
+                    //Get the current tile object
+                    var currentTile = this.rooms[i].layout[layoutYPos][layoutXPos];
+
+                    //Place the tile that is on the layout on this position on the map
+                    this.tiles[y][x] = currentTile;
+
+                }
+
+            }
+
+        }
+
+        //Generate the corridors for these rooms on the current map object
+        this.mapFactory.generateCorridors(this);
 
     }
 
@@ -649,74 +1406,129 @@ Roguelike.MapFactory.prototype = {
     }
 
 };
-Roguelike.Vector2 = function(x, y){
+Roguelike.Room = function(x, y, w, h){
 
     /*
-    * @property {int} x - The x coordinate of this vector2 object
+    * @property {int} x1 - The X position of the top left corner of this room
     */
-    this.x = x;
+    this.x1 = x;
 
     /*
-    * @property {int} x - The y coordinate of this vector2 object
+    * @property {int} x2 - The X position of the top right corner of this room
     */
-    this.y = y;
+    this.x2 = w + x;
+
+    /*
+    * @property {int} y1 - The Y position of top left corner of this room
+    */
+    this.y1 = y;
+
+    /*
+    * @property {int} y2 - The Y position of bottom left corner of this room
+    */
+    this.y2 = y + h;
+
+    /*
+    * @property {int} w - The width of this room, defined in tiles
+    */
+    this.w = w;
+
+    /*
+    * @property {int} h - The heigth of this room, defined in tiles
+    */
+    this.h = h;
+
+    /*
+    * @property {array} layout - The array that contains the layout of this room
+    */
+    this.layout = [];
+
+    /*
+    * @property {object} exit - An object that holds the exit coordinates of this room
+    */
+    this.exit = null;
 
 };
 
-Roguelike.Vector2.prototype = {
+Roguelike.Room.prototype = {
 
     /*
-    * Add another vector2 object
+    * Initialize the layout of the room, filling it with default tiles
+    * @protected
+    */
+    initialize: function(){
+
+        //Loop through every horizontal row
+        for(y = 0; y < this.h; y++){
+
+            //Initialize this row
+            this.layout[y] = [];
+
+            //Loop through every vertical row
+            for(x = 0; x < this.w; x++){
+
+                //Check if the position filled has to be a wall or floor
+                if(y === 0 || y === this.h - 1 || x === 0 || x === this.w - 1){
+                    this.layout[y][x] = new Roguelike.Tile(1, true, this);
+                }else{
+                    this.layout[y][x] = new Roguelike.Tile(2, false, this);
+                }
+
+            }
+
+        }
+
+    },
+
+    /*
+    * Generate an exit on a random side of this room
+    * @protected
+    */
+    generateExit: function(){
+
+        //Add an exit on one of the sides of the wall
+        //But one tile further into the room, so we don't get weird openings
+        //when the generation of a corridor goes the other direction
+        switch(Roguelike.Utils.randomNumber(1,4)){
+
+            case(1): //Top
+                 this.exit = {x: Roguelike.Utils.randomNumber(1, this.w - 2), y: this.h - 2};
+            break;
+
+            case(2): //Bottom
+                 this.exit = {x: Roguelike.Utils.randomNumber(1, this.w - 2), y: 1};
+            break;
+
+            case(3): //Left
+                 this.exit = {x: this.w - 2, y: Roguelike.Utils.randomNumber(1, this.h - 2)};
+            break;
+
+            case(4): //Right
+                 this.exit = {x: 1, y: Roguelike.Utils.randomNumber(1, this.h - 2)};
+            break;
+
+        }
+
+    },
+
+    /*
+    * Generate an entrance to this dungeon, also the players initial spawn position
     * @protected
     *
-    * @param {Roguelike.Vector2} other - The y other vector2 object
+    * @param {Roguelike.Map} map - The map on which this dungeon entrance is going to spawn
     */
-    add: function(other){
+    generateDungeonEntrance: function(map){
 
-        var dx = pos.x - this.x;
-        var dy = pos.y - this.y;
-        
-        return Math.abs(Math.sqrt((dx * dx) + (dy * dy)));
+        //Get random positions within the room
+        var positionX = Roguelike.Utils.randomNumber(2, this.w - 3);
+        var positionY = Roguelike.Utils.randomNumber(2, this.h - 3);
 
-    },
+        //Store the entrance location on the map
+        map.entrance = {
+            x: this.x1 + positionX,
+            y: this.y1 + positionY
+        };
 
-    /*
-    * Distance to another Vector2 Object
-    * @protected
-    *
-    * @param {object} pos - The position of the other object
-    */
-    distance: function(pos) {
-        var dx = pos.x - this.x;
-        var dy = pos.y - this.y;
-        
-        return Math.abs(Math.sqrt((dx * dx) + (dy * dy)));
-    },
-    
-    /*
-    * Manhattan distance to another object
-    * @protected
-    *
-    * @param {object} pos - The position of the other object
-    */
-    manhattan: function(pos) {
-        return(Math.abs(this.x - pos.x) + Math.abs(this.y - pos.y));
-    },
-    
-    /*
-    * Clone the current Vector2 Object
-    * @protected
-    */
-    clone: function() {
-        return(new Vector2(this.x, this.y));
-    },
-    
-    /*
-    * Create a string from this Vector2 Object
-    * @protected
-    */
-    toString: function() {
-        return("(" + this.x + ", " + this.y + ")");
     }
 
 };
@@ -908,844 +1720,6 @@ Roguelike.LightSource.prototype = {
     }
 
 };
-Roguelike.Tile = function(type, blockLight, room){
-
-    /*
-    * @property {int} The kind of tile, wall, floor, void etc
-    */
-    this.type = type;
-
-    /*
-    * @property {Roguelike.Room} belongsTo - The room that this tile belongs to
-    */
-    this.belongsTo = room || null;
-
-    /*
-    * @property {Roguelike.Object} staticObject - A static object that is on this tile
-    */
-	this.staticObject = null;
-
-    /*
-    * @property {bool} staticObject - A static object that is on this tile
-    */
-    this.blockLight = blockLight;
-
-    /*
-    * @property {int} lightLevel - The brightness of the current tile
-    */
-    this.lightLevel = 0;
-
-    /*
-    * @property {bool} explored - Boolean if a tile has allready been explorer by the player
-    */
-    this.explored = false;
-
-};
-
-Roguelike.Tile.prototype = {
-
-};
-Roguelike.Object = function(position, type){
-
-    /*
-    * @property {object} position - The x and y coordinate of this object, in tiles
-    */
-    this.position = position;
-
-    /*
-    * @property {int} type - The number on the tileset that this object looks like
-    */
-    this.type = type;
-
-};
-
-Roguelike.Object.prototype = {
-
-    
-
-};
-Roguelike.Player = function(game, position){
-
-    /*
-    * @property {Roguelike.Game} game - Reference to the current game object
-    */
-    this.game = game;
-
-    /*
-    * @property {object} position - The x and y coordinate of this player, in tiles
-    */
-    this.position = Object.create(position);
-
-    /*
-    * @property {int} speed - The speed of the player, in tiles
-    */
-    this.speed = 1;
-
-    /*
-    * @property {int} lastKey - The last button the player has clicked
-    */
-    this.lastKey = 0;
-
-};
-
-Roguelike.Player.prototype = {
-
-    /*
-    * The function that get's called every game loop
-    * @protected
-    *
-    * @param {int} step - The time between frames, in seconds
-    */
-    update: function(step){
-
-        //If the last keystroke is the same as the current keystroke, don't do anything
-        //This makes sure the player can only move 1 tile at a time
-        if(this.lastKey !== this.game.controls.current){
-
-            //If the keystroke has changed, update the last keystroke variable
-            this.lastKey = this.game.controls.current;
-
-            //Check which controls are being pressed and update the player accordingly
-            if(this.game.controls.left && this.game.map.tiles[this.position.y][this.position.x - this.speed].type === 2){
-                this.position.x -= this.speed;
-            }else if(this.game.controls.up && this.game.map.tiles[this.position.y - this.speed][this.position.x].type === 2){
-                this.position.y -= this.speed;
-            }else if(this.game.controls.right && this.game.map.tiles[this.position.y][this.position.x + this.speed].type === 2){
-                this.position.x += this.speed;
-            }else if(this.game.controls.down && this.game.map.tiles[this.position.y + this.speed][this.position.x].type === 2){
-                this.position.y += this.speed;
-            }
-
-        }
-
-    }
-
-};
-Roguelike.Controls = function(){
-
-    /*
-    * @property {bool} left - The left key on the keyboard, pressed or not
-    */
-    this.left = false;
-
-    /*
-    * @property {bool} right - The right key on the keyboard, pressed or not
-    */
-    this.right = false;
-
-    /*
-    * @property {bool} up - The up key on the keyboard, pressed or not
-    */
-    this.up = false;
-
-    /*
-    * @property {bool} down - The down key on the keyboard, pressed or not
-    */
-    this.down = false;
-
-    /*
-    * @property {int} current - The current key being pressed
-    */
-    this.current = 0;
-
-};
-
-Roguelike.Controls.prototype = {
-
-    /*
-    * Function that handles keydown events
-    * @protected
-    *
-    * @param {Event Object} e - The event object from the keypress
-    */
-    keyDown: function(e){
-
-        switch(e.keyCode){
-
-            //Left arrow - A
-            case 37: case 65:
-
-                //Left key
-                this.left = true;
-                break;
-
-            //Up arrow - W
-            case 38: case 87:
-
-                //Up key
-                this.up = true;
-                break;
-
-            //Right arrow - D
-            case 39: case 68:
-
-                //Right key
-                this.right = true;
-                break;
-
-            //Down arrow - S
-            case 40: case 83:
-
-                //Down key
-                this.down = true;
-                break;
-
-        }
-
-        //Set the current key being pressed to the current key value
-        this.current = e.keyCode;
-
-    },
-
-    /*
-    * Function that handles keyup events
-    * @protected
-    *
-    * @param {Event Object} e - The event object from the keypress
-    */
-    keyUp: function(e){
-
-        switch(e.keyCode){
-
-            //Left arrow - A
-            case 37: case 65:
-
-                //Left key
-                this.left = false;
-                break;
-
-            //Up arrow - W
-            case 38: case 87:
-
-                //Up key
-                this.up = false;
-                break;
-
-            //Right arrow - D
-            case 39: case 68:
-
-                //Right key
-                this.right = false;
-                break;
-
-            //Down arrow - S
-            case 40: case 83:
-
-                //Down key
-                this.down = false;
-                break;
-
-        }
-
-        //Clear the current key value
-        this.current = 0;
-
-    }
-
-};
-Roguelike.Boundary = function(left, top, width, height){
-
-    /*
-    * @property {int} left - The left position of this boundary, in pixels
-    */
-    this.left = left || 0;
-
-    /*
-    * @property {int} top - The top position of this boundary, in pixels
-    */
-    this.top = top || 0;
-
-    /*
-    * @property {int} width - The width of this boundary, in pixels
-    */
-    this.width = width || 0;
-
-    /*
-    * @property {int} height - The height of this boundary, in pixels
-    */
-    this.height = height || 0;
-
-    /*
-    * @property {int} right - The right position of this boundary, in pixels
-    */
-    this.right = (this.left + this.width);
-
-    /*
-    * @property {int} bottom - The bottom position of this boundary, in pixels
-    */
-    this.bottom = (this.top + this.height);
-
-};
-
-Roguelike.Boundary.prototype = {
-
-    /*
-    * Function that allows the user to set new values for the boundary
-    * @protected
-    *
-    * @param {int} left - The left position of this boundary, in pixels
-    * @param {int} top - The top position of this boundary, in pixels
-    * @param {int} width - Optional: The width of this boundary, in pixels
-    * @param {int} height - Optional: The height of this boundary, in pixels
-    */
-    set: function(left, top, width, height){
-
-        this.left = left;
-        this.top = top;
-        this.width = width || this.width;
-        this.height = height || this.height;
-        this.right = (this.left + this.width);
-        this.bottom = (this.top + this.height);
-
-    },
-
-    /*
-    * Function to check if one boundary is still inside another boundary
-    * @protected
-    *
-    * @param {Roguelike.Boundary} boundary - The boundary to check against
-    */
-    isWithin: function(boundary){
-
-        return(
-            boundary.left <= this.left && 
-            boundary.right >= this.right &&
-            boundary.top <= this.top && 
-            boundary.bottom >= this.bottom
-        );
-
-    },
-
-    /*
-    * Function to check if one boundary overlaps another boundary
-    * @protected
-    *
-    * @param {Roguelike.Boundary} boundary - The boundary to check against
-    */
-    isOverlapping: function(boundary){
-
-        return(
-            this.left < boundary.right && 
-            boundary.left < this.right && 
-            this.top < boundary.bottom &&
-            boundary.top < this.bottom
-        );
-
-    }
-
-};
-Roguelike.Camera = function(game, position){
-
-    /*
-    * @property {Roguelike.Game} game - Reference to the current game object
-    */
-    this.game = game;
-
-    /*
-    * @property {object} position - The x and y top left coordinates of this camera, in pixels
-    */
-    this.position = position;
-
-    /*
-    * @property {int} viewportWidth - The width of the game's canvas, in pixels
-    */
-    this.viewportWidth = game.settings.canvas.width;
-
-    /*
-    * @property {int} viewportHeight - The height of the game's canvas, in pixels
-    */
-    this.viewportHeight = game.settings.canvas.height;
-
-    /*
-    * @property {int} minimumDistanceX - The minimal distance from horizontal borders before the camera starts to move, in pixels
-    */
-    this.minimumDistanceX = 0;
-
-    /*
-    * @property {int} minimumDistanceY - The minimal distance from vertical borders before the camera starts to move, in pixels
-    */
-    this.minimumDistanceY = 0;
-
-    /*
-    * @property {object} followObject - The object that should be followed by the camera
-    */
-    this.followObject = null;
-
-    /*
-    * @property {Roguelike.Boundary} viewportBoundary - The boundary that represents the viewport
-    */
-    this.viewportBoundary = new Roguelike.Boundary(
-        this.position.x * game.settings.tileSize,
-        this.position.y * game.settings.tileSize,
-        this.viewportWidth,
-        this.viewportHeight
-    );
-
-    /*
-    * @property {Roguelike.Boundary} mapBoundary - The boundary that represents the viewport
-    */
-    this.mapBoundary = new Roguelike.Boundary(
-        0,
-        0,
-        game.settings.tilesX * game.settings.tileSize,
-        game.settings.tilesY * game.settings.tileSize
-    );
-
-};
-
-Roguelike.Camera.prototype = {
-
-    /*
-    * Function to call when you want to follow a specific object
-    * @protected
-    *
-    * @param {object} followObject - The object that should be followed by the camera
-    * @param {int} minimumDistanceX - The minimal distance from horizontal borders before the camera starts to move
-    * @param {int} minimumDistanceY - The minimal distance from vertical borders before the camera starts to move
-    */
-    follow: function(followObject, minimumDistanceX, minimumDistanceY){
-
-        //Set the follow object to be the object that's passed along
-        //Object needs to have a position variable, containing an
-        //X and an Y value, in tiles
-        this.followObject = followObject;
-        this.minimumDistanceX = minimumDistanceX;
-        this.minimumDistanceY = minimumDistanceY;
-
-    },
-
-    /*
-    * Function to update the camera to a new position, for example following an object
-    * @protected
-    */
-    update: function(){
-
-        //Check if the camera even has to move
-        if(this.followObject !== null){
-
-            //Move the camera horizontal first
-            if((this.followObject.position.x * game.settings.tileSize) - this.position.x  + this.minimumDistanceX > this.viewportWidth){
-
-                //Set the new horizontal position for the camera
-                this.position.x = (this.followObject.position.x * game.settings.tileSize) - (this.viewportWidth - this.minimumDistanceX);
-
-            }else if((this.followObject.position.x * game.settings.tileSize) - this.minimumDistanceX < this.position.x){
-
-                //Set the new horizontal position for the camera
-                this.position.x = (this.followObject.position.x * game.settings.tileSize)  - this.minimumDistanceX;
-
-            }
-
-            //Then move the camera vertical
-            if((this.followObject.position.y * game.settings.tileSize) - this.position.y  + this.minimumDistanceY > this.viewportHeight){
-
-                //Set the new vertical position for the camera
-                this.position.y = (this.followObject.position.y * game.settings.tileSize) - (this.viewportHeight - this.minimumDistanceY);
-
-            }else if((this.followObject.position.y * game.settings.tileSize)  - this.minimumDistanceY < this.position.y){
-
-                //Set the new vertical position for the camera
-                this.position.y = (this.followObject.position.y * game.settings.tileSize) - this.minimumDistanceY;
-
-            }
-
-        }
-
-        //Now we update our viewport's boundaries
-        this.viewportBoundary.set(this.position.x, this.position.y);
-
-        //We don't want the camera leaving the world's boundaries, for obvious reasons
-        if(!this.viewportBoundary.isWithin(this.mapBoundary)){
-
-            //Left
-            if(this.viewportBoundary.left < this.mapBoundary.left){
-                this.position.x = this.mapBoundary.left;
-            }
-
-            //Top
-            if(this.viewportBoundary.top < this.mapBoundary.top){               
-                this.position.y = this.mapBoundary.top;
-            }
-
-            //Right
-            if(this.viewportBoundary.right > this.mapBoundary.right){
-                this.position.x = this.mapBoundary.right - this.viewportWidth;
-            }
-
-            //Bottom
-            if(this.viewportBoundary.bottom > this.mapBoundary.bottom){
-                this.position.y = this.mapBoundary.bottom - this.viewportHeight;
-            }
-
-        }
-
-    }
-
-};
-Roguelike.Map = function(game){
-
-    /*
-    * @property {Roguelike.Game} game - Reference to the current game object
-    */
-    this.game = game;
-
-    /*
-    * @property {int} tilesX - The number of horizontal tiles on this map
-    */
-    this.tilesX = game.settings.tilesX;
-
-    /*
-    * @property {int} tilesY - The number of vertical tiles on this map
-    */
-    this.tilesY = game.settings.tilesY;
-
-    /*
-    * @property {int} maxRooms - The maximum number of rooms allowed on this map
-    */
-    this.maxRooms = game.settings.maxRooms;
-
-    /*
-    * @property {array} rooms - An array that holds all room objects
-    */
-    this.rooms = [];
-
-    /*
-    * @property {array} corridors - An array that holds all corridor objects
-    */
-    this.corridors = [];
-
-    /*
-    * @property {array} tiles - An array that holds all tile objects
-    */
-    this.tiles = [];
-
-    /*
-    * @property {array} objects - An array that holds all objects that are on the map
-    */
-    this.objects = [];
-
-    /*
-    * @property {int} tileSize - The width and height of a single tile on the map
-    */
-    this.tileSize = game.settings.tileSize;
-
-    /*
-    * @property {int} minRoomWidth - The minimum width of a room on this map
-    */
-    this.minRoomWidth = game.settings.minRoomWidth;
-
-    /*
-    * @property {int} maxRoomWidth - The maximum width of a room on this map
-    */
-    this.maxRoomWidth = game.settings.maxRoomWidth;
-
-    /*
-    * @property {int} minRoomHeight - The minimum heigth of a room on this map
-    */
-    this.minRoomHeight = game.settings.minRoomHeight;
-
-    /*
-    * @property {int} maxRoomHeight - The maximum heigth of a room on this map
-    */
-    this.maxRoomHeight = game.settings.maxRoomHeight;
-
-    /*
-    * @property {Roguelike.MapFactory} mapFactory - The room factory is responsible for creating rooms and corridors on this map
-    */
-    this.mapFactory = null;
-
-    /*
-    * @property {entrance} object - An object that holds the position of the entrance of this map
-    */
-    this.entrance = null;
-
-};
-
-Roguelike.Map.prototype = {
-
-    /*
-    * Initialize the layout of the map, filling it with empty tiles
-    * @protected
-    */
-    initialize: function(){
-
-        //Create the map factory
-        this.mapFactory = new Roguelike.MapFactory(this.game);
-
-        //Loop through every horizontal row
-        for(y = 0; y < this.tilesY; y++){
-
-            //Initialize this row
-            this.tiles[y] = [];
-
-            //Loop through every vertical row
-            for(x = 0; x < this.tilesX; x++){
-
-                //Initialize this position by setting it to zero, and blocking light
-                this.tiles[y][x] = new Roguelike.Tile(0, true);
-
-            }
-
-        }
-
-    },
-
-    /*
-    * Check if a single room overlaps a room that is allready on the map
-    * @protected
-    *
-    * @param {Roguelike.Room} room - The room object that has to be checked
-    */
-    roomIntersectsWith: function(room){
-
-        //Loop through every room in the list
-        for (var i = 0; i < this.rooms.length; i++) {
-
-            //Check if the room intersects with the current room
-            if(room.x1 <= this.rooms[i].x2 && room.x2 >= this.rooms[i].x1 && room.y1 <= this.rooms[i].y2 && room.y2 >= this.rooms[i].y1){
-                return true;
-            }
-
-        }
-        //If the room doesn't intersect another room, return false
-        return false;
-
-    },
-
-    /*
-    * Add all the rooms from the room list to the map, get the tiles from each room's layout
-    * @protected
-    *
-    * @param {Roguelike.Room} room - The room object that has to be checked
-    */
-    addRooms: function(){
-
-        //Loop through each room in the list
-        for (var i = 0; i < this.rooms.length; i++) {
-
-            //Loop through every horizontal row
-            for(y = this.rooms[i].y1; y < this.rooms[i].y2; y++){
-
-                //What is the current Y position in the layout of the current room
-                var layoutYPos = this.rooms[i].y2 - y - 1;
-
-                //Loop through every vertical row
-                for(x = this.rooms[i].x1; x < this.rooms[i].x2; x++){
-
-                    //What is the current X position in the layout of the current room
-                    var layoutXPos = this.rooms[i].x2 - x - 1;
-
-                    //Get the current tile object
-                    var currentTile = this.rooms[i].layout[layoutYPos][layoutXPos];
-
-                    //Place the tile that is on the layout on this position on the map
-                    this.tiles[y][x] = currentTile;
-
-                }
-
-            }
-
-        }
-
-        //Generate the corridors for these rooms on the current map object
-        this.mapFactory.generateCorridors(this);
-
-    }
-
-};
-Roguelike.Room = function(x, y, w, h){
-
-    /*
-    * @property {int} x1 - The X position of the top left corner of this room
-    */
-    this.x1 = x;
-
-    /*
-    * @property {int} x2 - The X position of the top right corner of this room
-    */
-    this.x2 = w + x;
-
-    /*
-    * @property {int} y1 - The Y position of top left corner of this room
-    */
-    this.y1 = y;
-
-    /*
-    * @property {int} y2 - The Y position of bottom left corner of this room
-    */
-    this.y2 = y + h;
-
-    /*
-    * @property {int} w - The width of this room, defined in tiles
-    */
-    this.w = w;
-
-    /*
-    * @property {int} h - The heigth of this room, defined in tiles
-    */
-    this.h = h;
-
-    /*
-    * @property {array} layout - The array that contains the layout of this room
-    */
-    this.layout = [];
-
-    /*
-    * @property {object} exit - An object that holds the exit coordinates of this room
-    */
-    this.exit = null;
-
-};
-
-Roguelike.Room.prototype = {
-
-    /*
-    * Initialize the layout of the room, filling it with default tiles
-    * @protected
-    */
-    initialize: function(){
-
-        //Loop through every horizontal row
-        for(y = 0; y < this.h; y++){
-
-            //Initialize this row
-            this.layout[y] = [];
-
-            //Loop through every vertical row
-            for(x = 0; x < this.w; x++){
-
-                //Check if the position filled has to be a wall or floor
-                if(y === 0 || y === this.h - 1 || x === 0 || x === this.w - 1){
-                    this.layout[y][x] = new Roguelike.Tile(1, true, this);
-                }else{
-                    this.layout[y][x] = new Roguelike.Tile(2, false, this);
-                }
-
-            }
-
-        }
-
-    },
-
-    /*
-    * Generate an exit on a random side of this room
-    * @protected
-    */
-    generateExit: function(){
-
-        //Add an exit on one of the sides of the wall
-        //But one tile further into the room, so we don't get weird openings
-        //when the generation of a corridor goes the other direction
-        switch(Roguelike.Utils.randomNumber(1,4)){
-
-            case(1): //Top
-                 this.exit = {x: Roguelike.Utils.randomNumber(1, this.w - 2), y: this.h - 2};
-            break;
-
-            case(2): //Bottom
-                 this.exit = {x: Roguelike.Utils.randomNumber(1, this.w - 2), y: 1};
-            break;
-
-            case(3): //Left
-                 this.exit = {x: this.w - 2, y: Roguelike.Utils.randomNumber(1, this.h - 2)};
-            break;
-
-            case(4): //Right
-                 this.exit = {x: 1, y: Roguelike.Utils.randomNumber(1, this.h - 2)};
-            break;
-
-        }
-
-    },
-
-    /*
-    * Generate an entrance to this dungeon, also the players initial spawn position
-    * @protected
-    *
-    * @param {Roguelike.Map} map - The map on which this dungeon entrance is going to spawn
-    */
-    generateDungeonEntrance: function(map){
-
-        //Get random positions within the room
-        var positionX = Roguelike.Utils.randomNumber(2, this.w - 3);
-        var positionY = Roguelike.Utils.randomNumber(2, this.h - 3);
-
-        //Store the entrance location on the map
-        map.entrance = {
-            x: this.x1 + positionX,
-            y: this.y1 + positionY
-        };
-
-    }
-
-};
-Roguelike.Utils = {
-
-	/*
-	* Function to generate a random number between two values
-	* @param {int} from - The minimum number
-	* @param {int} to - The maximum number
-	*/
-	randomNumber: function(from,to){
-
-		return Math.floor(Math.random()*(to-from+1)+from);
-
-	},
-
-	/*
-	* Function to extend the default options with the users options
-	* @param {object} a - The original object to extend
-	* @param {object} b - The new settings that override the original object
-	*/
-	extend: function(a, b){
-		for(var key in b)
-			if(b.hasOwnProperty(key))
-				a[key] = b[key];
-		return a;
-	},
-
-	/*
-	* Function to return the mouse position on a canvas object
-	* @param {object} canvas - The canvas object to track
-	* @param {object} event - Mouse event
-	*/
-	getMousePos: function(e) {
-		var rect = canvas.getBoundingClientRect();
-		return{
-			x: e.clientX - rect.left,
-			y: e.clientY - rect.top
-		};
-	},
-
-	/*
-	* Draw a red square on the current tile or room, console log the tile information
-	* @param {object} canvas - The canvas object to track
-	* @param {object} event - Mouse event
-	*/
-	debugTiles: function(e) {
-
-		var mousePos = Roguelike.Utils.getMousePos(e);
-		var x = Math.floor(mousePos.x / 15 );
-		var y = Math.floor(mousePos.y / 15 );
-
-		console.clear();
-		game.renderer.draw(game.map);
-		tileType = game.map.tiles[y][x].type;
-
-		console.log(game.map.tiles[y][x]);
-
-		oContext.fillStyle = "rgba(255, 0, 0, 0.2)";
-
-		if(game.map.tiles[y][x].belongsTo){
-			var room = game.map.tiles[y][x].belongsTo;
-			oContext.fillRect(room.x1 * game.map.tileSize, room.y1 * game.map.tileSize , room.w * game.map.tileSize, room.h * game.map.tileSize);
-		}else{
-			oContext.fillRect(x * game.map.tileSize, y * game.map.tileSize , game.map.tileSize, game.map.tileSize);
-		}
-
-	}
-
-};
 window.onload = function(){
 
     initializeCanvas();
@@ -1763,7 +1737,7 @@ function initializeCanvas(){
         canvas: canvas, //The canvas object on which our dungeon is placed on
         tilesX: 60, //The number of horizontal tiles on this map
         tilesY: 40, //The number of vertical tiles on this map
-        tileSize: 15, //The width and height of a single tile
+        tileSize: 25, //The width and height of a single tile
         maxRooms: 10, //The maximum number of rooms on this map
         minRoomWidth: 6, //The minimum width of a single room
         maxRoomWidth: 12, //The maximum width of a single room
