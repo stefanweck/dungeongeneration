@@ -26,6 +26,7 @@ module.exports = function(grunt) {
               'lib/gameobjects/object.js',
               'lib/gameobjects/player.js',
               'lib/input/controls.js',
+              'lib/input/event.js',
               'lib/tilemap/tile.js',
               'lib/tilemap/map.js',
               'lib/tilemap/mapfactory.js',
