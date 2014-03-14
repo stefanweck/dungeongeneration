@@ -1,4 +1,4 @@
-/*! Dungeon Generator - v1.6.0 - 2014-03-12
+/*! Dungeon Generator - v1.6.0 - 2014-03-14
 * https://github.com/stefanweck/dungeongeneration
 * Copyright (c) 2014 Stefan Weck */
 /**
@@ -66,6 +66,11 @@ Roguelike.Game = function(userSettings) {
 	 * @property {Roguelike.Systems.Control} controlSystem - The system object that handles user input and kickstarts the game!
 	 */
 	this.controlSystem = null;
+
+	/**
+	 * @property {Roguelike.Systems.Collision} collisionSystem - The system object that handles collision between entities
+	 */
+	this.collisionSystem = null;
 
 	/**
 	 * @property {Roguelike.Camera} camera - Reference to the camera
@@ -150,8 +155,9 @@ Roguelike.Game.prototype = {
 			}
 		);
 
-		//Initialize the controlsystem
+		//Initialize the static systems
 		this.controlSystem = new Roguelike.Systems.Control(this);
+		this.collisionSystem = new Roguelike.Systems.Collision(this);
 
 		//Add all other systems to the game
 		this.systems.push(new Roguelike.Systems.Render(this));
@@ -211,12 +217,15 @@ Roguelike.Game.prototype = {
 		this.camera.update();
 
 		//Render the changes
-		this.renderer.update();
+		this.renderer.clear();
+		this.renderer.drawMap();
 
 		//Update each system
 		for(var s = 0; s < this.systems.length; s++){
 			this.systems[s].update();
 		}
+
+		this.renderer.drawLightMap();
 
 	}
 
@@ -266,16 +275,19 @@ Roguelike.Renderer.prototype = {
 				//Get the type of the current tile
 				var tileType = this.game.map.tiles[y][x].type;
 
-				//Get the corrosponding color of this tile from the array of colors
+				//Get the corresponding color of this tile from the array of colors
 				this.context.fillStyle = this.tileColors[tileType];
+
+				//Get the size of one tile to determine how big each rectangle is
+				var tileSize = this.game.map.tileSize;
 
 				//Create a rectangle!
 				this.context.fillRect(
 					//Get the current position of the tile, and check where it is in the camera's viewport
-					(x * this.game.map.tileSize) - this.game.camera.position.x,
-					(y * this.game.map.tileSize) - this.game.camera.position.y,
-					this.game.map.tileSize,
-					this.game.map.tileSize
+					(x * tileSize) - this.game.camera.position.x,
+					(y * tileSize) - this.game.camera.position.y,
+					tileSize,
+					tileSize
 				);
 
 			}
@@ -309,13 +321,16 @@ Roguelike.Renderer.prototype = {
 
 				}
 
+				//Get the size of one tile to determine how big each rectangle is
+				var tileSize = this.game.map.tileSize;
+
 				//Create a rectangle!
 				this.context.fillRect(
 					//Get the current position of the tile, and check where it is in the camera's viewport
-					(x * this.game.map.tileSize) - this.game.camera.position.x,
-					(y * this.game.map.tileSize) - this.game.camera.position.y,
-					this.game.map.tileSize,
-					this.game.map.tileSize
+					(x * tileSize) - this.game.camera.position.x,
+					(y * tileSize) - this.game.camera.position.y,
+					tileSize,
+					tileSize
 				);
 
 			}
@@ -328,20 +343,14 @@ Roguelike.Renderer.prototype = {
 	},
 
 	/**
-	 * All the functions that need to be executed every time the game updates
+	 * Function to clear the canvas
 	 * @protected
 	 *
 	 */
-	update: function() {
+	clear: function() {
 
 		//Clear the entire canvas
 		this.context.clearRect(0, 0, this.game.settings.canvas.width, this.game.settings.canvas.height);
-
-		//Redraw the map
-		this.drawMap();
-
-		//Draw the lightmap!
-		this.drawLightMap();
 
 	}
 
@@ -464,19 +473,21 @@ Roguelike.Camera = function(game, position) {
 Roguelike.Camera.prototype = {
 
 	/**
-	 * Function to call when you want to follow a specific object
+	 * Function to call when you want to follow a specific entity
 	 * @protected
 	 *
-	 * @param {Roguelike.Entity} followObject - The entity that should be followed by the camera, this entity is required to have the position component
+	 * @param {Roguelike.Entity} followEntity - The entity that should be followed by the camera, this entity is required to have the position component
 	 * @param {int} minimumDistanceX - The minimal distance from horizontal borders before the camera starts to move
 	 * @param {int} minimumDistanceY - The minimal distance from vertical borders before the camera starts to move
 	 */
-	follow: function(followObject, minimumDistanceX, minimumDistanceY) {
+	follow: function(followEntity, minimumDistanceX, minimumDistanceY) {
 
 		//Set the follow object to be the object that's passed along
-		//Object needs to have a position variable, containing an
+		//Object needs to have a position component, containing an
 		//X and an Y value, in tiles
-		this.followObject = followObject.components.position;
+		this.followObject = followEntity.components.position;
+
+		//Set the minimum distance from the borders of the map
 		this.minimumDistanceX = minimumDistanceX;
 		this.minimumDistanceY = minimumDistanceY;
 
@@ -491,29 +502,32 @@ Roguelike.Camera.prototype = {
 		//Check if the camera even has to move
 		if(this.followObject !== null) {
 
+			//Define the variables needed for moving the camera
+			var tileSize = this.game.settings.tileSize;
+
 			//Move the camera horizontal first
-			if((this.followObject.x * this.game.settings.tileSize) - this.position.x + this.minimumDistanceX > this.viewportWidth) {
+			if((this.followObject.x * tileSize) - this.position.x + this.minimumDistanceX > this.viewportWidth) {
 
 				//Set the new horizontal position for the camera
-				this.position.x = (this.followObject.x * this.game.settings.tileSize) - (this.viewportWidth - this.minimumDistanceX);
+				this.position.x = (this.followObject.x * tileSize) - (this.viewportWidth - this.minimumDistanceX);
 
-			}else if((this.followObject.x * this.game.settings.tileSize) - this.minimumDistanceX < this.position.x) {
+			}else if((this.followObject.x * tileSize) - this.minimumDistanceX < this.position.x) {
 
 				//Set the new horizontal position for the camera
-				this.position.x = (this.followObject.x * this.game.settings.tileSize) - this.minimumDistanceX;
+				this.position.x = (this.followObject.x * tileSize) - this.minimumDistanceX;
 
 			}
 
 			//Then move the camera vertical
-			if((this.followObject.y * this.game.settings.tileSize) - this.position.y + this.minimumDistanceY > this.viewportHeight) {
+			if((this.followObject.y * tileSize) - this.position.y + this.minimumDistanceY > this.viewportHeight) {
 
 				//Set the new vertical position for the camera
-				this.position.y = (this.followObject.y * this.game.settings.tileSize) - (this.viewportHeight - this.minimumDistanceY);
+				this.position.y = (this.followObject.y * tileSize) - (this.viewportHeight - this.minimumDistanceY);
 
-			}else if((this.followObject.y * this.game.settings.tileSize) - this.minimumDistanceY < this.position.y) {
+			}else if((this.followObject.y * tileSize) - this.minimumDistanceY < this.position.y) {
 
 				//Set the new vertical position for the camera
-				this.position.y = (this.followObject.y * this.game.settings.tileSize) - this.minimumDistanceY;
+				this.position.y = (this.followObject.y * tileSize) - this.minimumDistanceY;
 
 			}
 
@@ -922,7 +936,9 @@ Roguelike.Components.Health = function(maxHealth) {
 	 */
 	this.name = 'health';
 
-	//Initialize the variables for this component
+	/**
+	 * @property {int} health - The starting, and maximum health of the entity
+	 */
 	this.health = this.maxHealth = maxHealth;
 
 };
@@ -957,8 +973,14 @@ Roguelike.Components.Position = function(x, y) {
 	 */
 	this.name = 'position';
 
-	//Initialize the variables for this component
+	/**
+	 * @property {int} x - The horizontal position of the entity
+	 */
 	this.x = x;
+
+	/**
+	 * @property {int} y - The vertical position of the entity
+	 */
 	this.y = y;
 
 };
@@ -1151,6 +1173,8 @@ Roguelike.Systems.Control.prototype = {
 	/**
 	 * Function that gets called when the user pressed one of the arrow keys
 	 * @protected
+	 *
+	 * @param {string} direction - The direction the entities are being moved
 	 */
 	moveEntities: function(direction) {
 
@@ -1173,35 +1197,66 @@ Roguelike.Systems.Control.prototype = {
 	/**
 	 * The function that gets called when the player moves
 	 * @protected
+	 *
+	 * @param {string} direction - The direction the entities are being moved
+	 * @param {Roguelike.Entity} entity - The entity that is being controlled
 	 */
 	moveEntity: function(direction, entity) {
 
+		//Get the current entities position component
 		var entityPosition = entity.getComponent("position");
+
+		//Declare the new position variable
+		var newPosition = {};
 
 		//Check which controls are being pressed and update the player accordingly
 		switch(direction){
 
 			case ('left'):
 
-				entityPosition.x -= 1;
+				newPosition = {x: entityPosition.x - 1, y: entityPosition.y};
+
+				if(this.game.collisionSystem.canMove(entity, newPosition)){
+
+					entityPosition.x -= 1;
+
+				}
 
 			break;
 
 			case ('up'):
 
-				entityPosition.y -= 1;
+				newPosition = {x: entityPosition.x, y: entityPosition.y - 1};
+
+				if(this.game.collisionSystem.canMove(entity, newPosition)){
+
+					entityPosition.y -= 1;
+
+				}
 
 			break;
 
 			case ('right'):
 
-				entityPosition.x += 1;
+				newPosition = {x: entityPosition.x + 1, y: entityPosition.y};
+
+				if(this.game.collisionSystem.canMove(entity, newPosition)){
+
+					entityPosition.x += 1;
+
+				}
 
 			break;
 
 			case ('down'):
 
-				entityPosition.y += 1;
+				newPosition = {x: entityPosition.x, y: entityPosition.y + 1};
+
+				if(this.game.collisionSystem.canMove(entity, newPosition)){
+
+					entityPosition.y += 1;
+
+				}
 
 			break;
 
@@ -1507,9 +1562,9 @@ Roguelike.Tile = function(type, blockLight, room) {
 	this.belongsTo = room || null;
 
 	/**
-	 * @property {Roguelike.Object} staticObject - A static object that is on this tile
+	 * @property {array} entities - An array that holds all entities on this tile
 	 */
-	this.staticObject = null;
+	this.entities = null;
 
 	/**
 	 * @property {bool} staticObject - A static object that is on this tile
@@ -1522,7 +1577,7 @@ Roguelike.Tile = function(type, blockLight, room) {
 	this.lightLevel = 0;
 
 	/**
-	 * @property {bool} explored - Boolean if a tile has allready been explorer by the player
+	 * @property {bool} explored - Boolean if a tile has already been explorer by the player
 	 */
 	this.explored = false;
 
