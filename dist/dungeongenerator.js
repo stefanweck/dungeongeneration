@@ -1,10 +1,10 @@
-/*! Dungeon Generator - v1.6.0 - 2014-03-14
+/*! Dungeon Generator - v1.6.5 - 2014-03-15
 * https://github.com/stefanweck/dungeongeneration
 * Copyright (c) 2014 Stefan Weck */
 /**
  * Roguelike javascript game with HTML5's canvas
  *
- * v.1.6.0 - Build on: 22 Feb 2014
+ * v.1.6.5 - Build on: 15 March 2014
  *
  * Features:
  * - Random Dungeon Generation ( Surprise! )
@@ -15,6 +15,7 @@
  * - Fog of War!
  * - Field of view for the player
  * - Configurable settings
+ * - A component entity system
  *
  * What's next?
  *
@@ -35,7 +36,7 @@
 var Roguelike = Roguelike || {
 
 	//Details, version etc
-	VERSION: '1.6',
+	VERSION: '1.6.5',
 
 	//Holder for all the game's available components
 	Components: {},
@@ -139,6 +140,12 @@ Roguelike.Game.prototype = {
 		//Generate rooms for this map
 		this.map.mapFactory.generateRooms();
 		this.map.addRooms();
+
+		//Generate the corridors on this map
+		this.map.mapFactory.generateCorridors();
+
+		//Generate doors on this map
+		this.map.mapFactory.generateDoors();
 
 		//Add all objects to the map
 		this.map.mapFactory.placeEntranceExitObjects();
@@ -957,6 +964,15 @@ Roguelike.Components.Health.prototype = {
 
 };
 
+Roguelike.Components.Door = function() {
+
+	/**
+	 * @property {string} name - The name of this system. This field is always required!
+	 */
+	this.name = 'door';
+
+};
+
 Roguelike.Components.KeyboardControl = function() {
 
 	/**
@@ -1266,6 +1282,51 @@ Roguelike.Systems.Control.prototype = {
 
 };
 
+Roguelike.Systems.Collision = function(game) {
+
+	/**
+	 * @property {string} name - The name of this system. This field is always required!
+	 */
+	this.name = 'collision';
+
+	/**
+	 * @property {Roguelike.Game} game - Reference to the current game object
+	 */
+	this.game = game;
+
+};
+
+Roguelike.Systems.Collision.prototype = {
+
+	/**
+	 * Function that gets called when an entity wants to move
+	 * @protected
+	 *
+	 * @param {Roguelike.Entity} entity - The entity that is being checked against the map
+	 * @param {object} newPosition - The new position the entity is trying to move to
+	 */
+	canMove: function(entity, newPosition) {
+
+		//Get the tile to which the entity is trying to move
+		var nextTile = this.game.map.tiles[newPosition.y][newPosition.x];
+
+		//Check for collision on the map, walls etc
+		if(nextTile.type !== 2){
+			return false;
+		}
+
+		//Check if there is one or more than one entity at the new location
+		if(nextTile.entities.length !== 0){
+			console.log(nextTile.entities);
+		}
+
+		//Function made it all the way down here, that means the entity is able to move to the new position
+		return true;
+
+	}
+
+};
+
 Roguelike.Event = function() {
 
 	/**
@@ -1564,7 +1625,7 @@ Roguelike.Tile = function(type, blockLight, room) {
 	/**
 	 * @property {array} entities - An array that holds all entities on this tile
 	 */
-	this.entities = null;
+	this.entities = [];
 
 	/**
 	 * @property {bool} staticObject - A static object that is on this tile
@@ -1669,6 +1730,11 @@ Roguelike.Map = function(game) {
 	 */
 	this.entrance = null;
 
+	/**
+	 * @property {exit} object - An object that holds the position of the exit of this map
+	 */
+	this.exit = null;
+
 };
 
 Roguelike.Map.prototype = {
@@ -1755,9 +1821,6 @@ Roguelike.Map.prototype = {
 
 		}
 
-		//Generate the corridors for these rooms on the current map object
-		this.mapFactory.generateCorridors(this);
-
 	}
 
 };
@@ -1769,6 +1832,11 @@ Roguelike.MapFactory = function(game) {
 	 */
 	this.game = game;
 
+	/**
+	 * @property {array} possibleDoorLocations - Stores all the positions of possible door locations
+	 */
+	this.possibleDoorLocations = [];
+
 };
 
 Roguelike.MapFactory.prototype = {
@@ -1779,12 +1847,15 @@ Roguelike.MapFactory.prototype = {
 	 */
 	generateRooms: function() {
 
+		//Define the map variable
+		var map = this.game.map;
+
 		//Maximum number of tries before stopping the placement of more rooms
 		var maxTries = this.game.map.maxRooms + 10;
 		var tries = 0;
 
 		//Create rooms and add them to the list
-		while(this.game.map.rooms.length < this.game.map.maxRooms) {
+		while(map.rooms.length < map.maxRooms) {
 
 			//Check if the limit has been reached, this prevents the while loop from crashing your page
 			//We assume there is no space left on the map and break the loop
@@ -1793,43 +1864,45 @@ Roguelike.MapFactory.prototype = {
 			}
 
 			//Generate random values ( in tiles )
+			//Start with generating a random width
 			var w = Roguelike.Utils.randomNumber(
-				this.game.map.minRoomWidth,
-				this.game.map.maxRoomWidth
+				map.minRoomWidth,
+				map.maxRoomWidth
 			);
+
+			//Generate a random height for the room
 			var h = Roguelike.Utils.randomNumber(
-				this.game.map.minRoomHeight,
-				this.game.map.maxRoomHeight
+				map.minRoomHeight,
+				map.maxRoomHeight
 			);
+
+			//Generate a random width horizontal position for the room
 			var x = Roguelike.Utils.randomNumber(
 				1,
-				this.game.map.tilesX - w - 1
+				map.tilesX - w - 1
 			);
+
+			//Generate a random vertical position for the room
 			var y = Roguelike.Utils.randomNumber(
 				1,
-				this.game.map.tilesY - h - 1
+				map.tilesY - h - 1
 			);
 
 			//Create a new room with these values
 			var room = new Roguelike.Room(x, y, w, h);
 
-			//We tryed to create a room at a certain position
+			//We tried to create a room at a certain position
 			tries++;
 
 			//Check if this room intersects with the other rooms, if not, add it to the list
-			if(!this.game.map.roomIntersectsWith(room)) {
+			if(!map.roomIntersectsWith(room)) {
 
 				//The room doesn't intersect, initialize the room layout
 				room.initialize();
 				room.generateExit();
 
-				//If this is the first room, add an entrance to the dungeon
-				if(this.game.map.rooms.length === 0) {
-					room.generateDungeonEntrance(this.game.map);
-				}
-
 				//Add the room to the room list
-				this.game.map.rooms.push(room);
+				map.rooms.push(room);
 
 				//Reset tries back to zero, giving the next room equal chances of spawning
 				tries = 0;
@@ -1846,7 +1919,7 @@ Roguelike.MapFactory.prototype = {
 	 */
 	generateCorridors: function() {
 
-		//Put the map in a variable for better readability
+		//Define the map variable
 		var map = this.game.map;
 
 		//After all the rooms are placed, go and generate the corridors
@@ -1869,8 +1942,8 @@ Roguelike.MapFactory.prototype = {
 	 */
 	generateCorridor: function(firstRoom, secondRoom) {
 
-		//Exit positions are stored in layout, so upperleft is 0,0. 
-		//We need the map's position, so we'll add the top left coords of the room
+		//Exit positions are stored in layout, so upper left is 0,0.
+		//We need the map's position, so we'll add the top left coordinates of the room
 		var firstExit = {
 			x: firstRoom.x1 + firstRoom.exit.x,
 			y: firstRoom.y1 + firstRoom.exit.y
@@ -1885,32 +1958,34 @@ Roguelike.MapFactory.prototype = {
 		if((secondExit.x - firstExit.x) > 0) {
 
 			//Corridor going left
-			for(i = secondExit.x; i >= firstExit.x; i--) {
+			for(var i = secondExit.x; i >= firstExit.x; i--) {
 				this.generateHorizontalCorridor(i, secondExit.y);
 			}
 
 		}else{
 
 			//Corridor going right
-			for(i = secondExit.x; i <= firstExit.x; i++) {
+			for(var i = secondExit.x; i <= firstExit.x; i++) {
 				this.generateHorizontalCorridor(i, secondExit.y);
 			}
+
 		}
 
 		//Vertical Corridors
 		if((secondExit.y - firstExit.y) > 0) {
 
 			//If the corridor is going up
-			for(i = secondExit.y; i >= firstExit.y; i--) {
+			for(var i = secondExit.y; i >= firstExit.y; i--) {
 				this.generateVerticalCorridor(firstExit.x, i);
 			}
 
 		}else{
 
 			//If the corridor is going down
-			for(i = secondExit.y; i <= firstExit.y; i++) {
+			for(var i = secondExit.y; i <= firstExit.y; i++) {
 				this.generateVerticalCorridor(firstExit.x, i);
 			}
+
 		}
 
 	},
@@ -1924,50 +1999,41 @@ Roguelike.MapFactory.prototype = {
 	 */
 	generateHorizontalCorridor: function(x, y) {
 
-		//Check if if there is a wall where we place this corridor, and have a random chance to spawn a door
-		var currentTileType = this.game.map.tiles[y][x].type;
-		var aboveTileType = this.game.map.tiles[y + 1][x].type;
-		var belowTileType = this.game.map.tiles[y - 1][x].type;
-		var randomChance = Roguelike.Utils.randomNumber(1, 100);
+		//Define the map variable
+		var map = this.game.map;
 
-		if(currentTileType === 1 && aboveTileType === 1 && belowTileType === 1 && randomChance > 60) {
+		//Get the current tile
+		var currentTile = map.tiles[y][x];
 
-			//Create the door object
-			var doorEntity = new Roguelike.Entity();
-			doorEntity.addComponent(new Roguelike.Components.Position(x, y));
-			doorEntity.addComponent(new Roguelike.Components.Sprite("#FFD900"));
+		//Check the tiles type from the tiles above and below the current tile
+		var aboveTile = map.tiles[y + 1][x];
+		var belowTile = map.tiles[y - 1][x];
 
-			//Add tis entity to the map
-			this.game.map.entities.addEntity(doorEntity);
+		//If the current tile type is a wall, and the tiles above and below here are also walls
+		//this may be a possible door location
+		if(currentTile.type === 1 && aboveTile.type === 1 && belowTile.type === 1){
 
-			//Add this static object to the tile object
-			this.game.map.tiles[y][x].staticObject = doorEntity;
-			this.game.map.tiles[y][x].blockLight = true;
+			//Push the coordinates into the array for later use
+			this.possibleDoorLocations.push({x: x, y: y});
 
 		}
 
-		//Place a floor tile
-		if(this.game.map.tiles[y + 1][x].staticObject !== null) {
-			this.game.map.tiles[y][x].type = 1;
-		}else if(this.game.map.tiles[y - 1][x].staticObject !== null) {
-			this.game.map.tiles[y][x].type = 1;
-		}else{
-			this.game.map.tiles[y][x].type = 2;
-
-			//Only set block light to false if there isn't a door at this position
-			if(this.game.map.tiles[y][x].staticObject === null) {
-				this.game.map.tiles[y][x].blockLight = false;
-			}
-		}
+		//Set the current tile type to floor
+		currentTile.type = 2;
+		currentTile.blockLight = false;
 
 		//Generate walls below this hallway
-		if(this.game.map.tiles[y + 1][x].type === 0) {
-			this.game.map.tiles[y + 1][x].type = 1;
+		if(aboveTile.type === 0) {
+
+			aboveTile.type = 1;
+
 		}
 
 		//Generate walls above this hallway
-		if(this.game.map.tiles[y - 1][x].type === 0) {
-			this.game.map.tiles[y - 1][x].type = 1;
+		if(belowTile.type === 0) {
+
+			belowTile.type = 1;
+
 		}
 
 	},
@@ -1976,36 +2042,145 @@ Roguelike.MapFactory.prototype = {
 	 * Generate a vertical corridor tile, and also place walls
 	 * @protected
 	 *
-	 * @param {int} prevx - The horizontal position of the tile that has to become a corridor
+	 * @param {int} x - The horizontal position of the tile that has to become a corridor
 	 * @param {int} y - The vertical position of the tile that has to become a corridor
 	 */
-	generateVerticalCorridor: function(prevx, y) {
+	generateVerticalCorridor: function(x, y) {
 
-		//If there is a door on our path, we simply remove it! Bye!
-		//TODO: Check if the object is indeed a door, not only an object
-		if(this.game.map.tiles[y][prevx].staticObject !== null) {
+		//Define the map variable
+		var map = this.game.map;
 
-			//Get the position of the door
-			var index = this.game.map.objects.indexOf(this.game.map.tiles[y][prevx].staticObject);
+		//Get the current tile
+		var currentTile = map.tiles[y][x];
 
-			//Remove the object from the tile and the array
-			this.game.map.objects.splice(index, 1);
-			this.game.map.tiles[y][prevx].staticObject = null;
+		//Check the tiles type from the tiles above and below the current tile
+		var rightTile = map.tiles[y][x + 1];
+		var leftTile = map.tiles[y][x - 1];
+
+		//If the current tile type is a wall, and the tiles left and right here are also walls
+		//this may be a possible door location
+		if(currentTile.type === 1 && rightTile.type === 1 && leftTile.type === 1){
+
+			//Push the coordinates into the array for later use
+			this.possibleDoorLocations.push({x: x, y: y});
 
 		}
 
 		//Set the current tile to floor
-		this.game.map.tiles[y][prevx].type = 2;
-		this.game.map.tiles[y][prevx].blockLight = false;
+		currentTile.type = 2;
+		currentTile.blockLight = false;
 
 		//Generate walls right from this hallway
-		if(this.game.map.tiles[y][prevx + 1].type === 0) {
-			this.game.map.tiles[y][prevx + 1].type = 1;
+		if(rightTile.type === 0) {
+
+			rightTile.type = 1;
+
 		}
+
 		//Generate walls left from this hallway
-		if(this.game.map.tiles[y][prevx - 1].type === 0) {
-			this.game.map.tiles[y][prevx - 1].type = 1;
+		if(leftTile.type === 0) {
+
+			leftTile.type = 1;
+
 		}
+
+		//The following checks prevent corners ending without being attached to another wall
+		//Because we don't know which direction the vertical corridor is being placed, we check
+		//upperleft, upperright, bottomleft and bottomright
+		//TODO: Find a better solution for these checks
+
+		//Also check for the upperright tile to maybe place a wall
+		if(map.tiles[y + 1][x + 1].type === 0) {
+
+			map.tiles[y + 1][x + 1].type = 1;
+
+		}
+
+		//Also check for the upperleft tile to maybe place a wall
+		if(map.tiles[y - 1][x - 1].type === 0) {
+
+			map.tiles[y - 1][x - 1].type = 1;
+
+		}
+
+		//Also check for the bottomright tile to maybe place a wall
+		if(map.tiles[y - 1][x + 1].type === 0) {
+
+			map.tiles[y - 1][x + 1].type = 1;
+
+		}
+
+		//Also check for the bottomleft tile to maybe place a wall
+		if(map.tiles[y + 1][x - 1].type === 0) {
+
+			map.tiles[y + 1][x - 1].type = 1;
+
+		}
+
+	},
+
+	/**
+	 * Generate some doors and spread them out over the map!
+	 * @protected
+	 */
+	generateDoors: function() {
+
+		//Loop through all possible door locations
+		for(var i = 0; i < this.possibleDoorLocations.length; i++){
+
+			//Store the current location in a local variable
+			var doorLocation = this.possibleDoorLocations[i];
+
+			//Get the tile at the location of the possible door location
+			var tileLeft = this.game.map.tiles[doorLocation.y][doorLocation.x - 1];
+			var tileRight = this.game.map.tiles[doorLocation.y][doorLocation.x + 1];
+			var tileUp = this.game.map.tiles[doorLocation.y + 1][doorLocation.x];
+			var tileDown = this.game.map.tiles[doorLocation.y - 1][doorLocation.x];
+
+			var randomNumber = Roguelike.Utils.randomNumber(0, 100);
+
+			//If the tiles left and right are walls and the tiles above and below are floors
+			if(tileLeft.type === 1 && tileRight.type === 1 && tileUp.entities.length === 0 && tileDown.entities.length === 0 && tileUp.type === 2 && tileDown.type === 2 && randomNumber > 60){
+
+				//Place a door at this location
+				this.placeDoor(doorLocation);
+
+			//If the tiles left and right are floors and the tiles above and below are walls
+			}else if(tileLeft.type === 2 && tileRight.type === 2 && tileLeft.entities.length === 0 && tileRight.entities.length === 0 && tileUp.type === 1 && tileDown.type === 1 && randomNumber > 60){
+
+				//Place a door at this location
+				this.placeDoor(doorLocation);
+
+			}
+
+		}
+
+	},
+
+	/**
+	 * Place the entrance and exit objects on the map
+	 * @protected
+	 */
+	placeDoor: function(position){
+
+		//Get the tile at the door's position
+		var tileAtPosition = this.game.map.tiles[position.y][position.x];
+
+		//Create the door entity
+		var doorEntity = new Roguelike.Entity();
+
+		//Add components to the door entity
+		doorEntity.addComponent(new Roguelike.Components.Position(position.x, position.y));
+		doorEntity.addComponent(new Roguelike.Components.Sprite("#FFD900"));
+
+		//Add the entity to the map
+		this.game.map.entities.addEntity(doorEntity);
+
+		//Add the door entity to the entities list on the current tile
+		tileAtPosition.entities.push(doorEntity);
+
+		//A door blocks light!
+		tileAtPosition.blockLight = true;
 
 	},
 
@@ -2015,18 +2190,41 @@ Roguelike.MapFactory.prototype = {
 	 */
 	placeEntranceExitObjects: function() {
 
-		//Get the position of the dungeon entrance
-		var entrancePosition = this.game.map.entrance;
+		//Generate a random number between 0 and the number of rooms - 1
+		//Minus one because then we can select the next room in the list as the exit room
+		var randomRoomIndex = Roguelike.Utils.randomNumber(0, this.game.map.rooms.length - 1);
+
+		//Get the rooms from the room list
+		var entranceRoom = this.game.map.rooms[randomRoomIndex];
+		var exitRoom = this.game.map.rooms[randomRoomIndex + 1];
+
+		//Let the rooms return a random tile
+		var entrancePosition = entranceRoom.getRandomPosition();
+		var exitPosition = exitRoom.getRandomPosition();
+
+		//Store the entrance and exit positions in the map for later use
+		//For example, player spawning
+		this.game.map.entrance = entrancePosition;
+		this.game.map.exit = exitPosition;
 
 		//Create the entrance entity
 		var entranceEntity = new Roguelike.Entity();
+
+		//Add components to the entrance entity
 		entranceEntity.addComponent(new Roguelike.Components.Position(entrancePosition.x, entrancePosition.y));
 		entranceEntity.addComponent(new Roguelike.Components.Sprite("#BD2D2D"));
 
+		//Create the entrance entity
+		var exitEntity = new Roguelike.Entity();
+
+		//Add components to the exit entity
+		exitEntity.addComponent(new Roguelike.Components.Position(exitPosition.x, exitPosition.y));
+		exitEntity.addComponent(new Roguelike.Components.Sprite("#BD2D2D"));
+
 		//Add this entity to the map
 		this.game.map.entities.addEntity(entranceEntity);
+		this.game.map.entities.addEntity(exitEntity);
 
-		//TODO: Make exit object
 
 	}
 
@@ -2085,19 +2283,25 @@ Roguelike.Room.prototype = {
 	initialize: function() {
 
 		//Loop through every horizontal row
-		for(y = 0; y < this.h; y++) {
+		for(var y = 0; y < this.h; y++) {
 
 			//Initialize this row
 			this.layout[y] = [];
 
 			//Loop through every vertical row
-			for(x = 0; x < this.w; x++) {
+			for(var x = 0; x < this.w; x++) {
 
 				//Check if the position filled has to be a wall or floor
 				if(y === 0 || y === this.h - 1 || x === 0 || x === this.w - 1) {
+
+					//Create a new wall tile
 					this.layout[y][x] = new Roguelike.Tile(1, true, this);
+
 				}else{
+
+					//Create a new floor tile
 					this.layout[y][x] = new Roguelike.Tile(2, false, this);
+
 				}
 
 			}
@@ -2118,19 +2322,27 @@ Roguelike.Room.prototype = {
 		switch(Roguelike.Utils.randomNumber(1, 4)) {
 
 			case(1): //Top
+
 				this.exit = {x: Roguelike.Utils.randomNumber(1, this.w - 2), y: this.h - 2};
+
 				break;
 
 			case(2): //Bottom
+
 				this.exit = {x: Roguelike.Utils.randomNumber(1, this.w - 2), y: 1};
+
 				break;
 
 			case(3): //Left
+
 				this.exit = {x: this.w - 2, y: Roguelike.Utils.randomNumber(1, this.h - 2)};
+
 				break;
 
 			case(4): //Right
+
 				this.exit = {x: 1, y: Roguelike.Utils.randomNumber(1, this.h - 2)};
+
 				break;
 
 		}
@@ -2138,22 +2350,21 @@ Roguelike.Room.prototype = {
 	},
 
 	/**
-	 * Generate an entrance to this dungeon, also the players initial spawn position
+	 * Returns a random position that is inside the current room
 	 * @protected
-	 *
-	 * @param {Roguelike.Map} map - The map on which this dungeon entrance is going to spawn
 	 */
-	generateDungeonEntrance: function(map) {
+	getRandomPosition: function() {
 
 		//Get random positions within the room
 		var positionX = Roguelike.Utils.randomNumber(2, this.w - 3);
 		var positionY = Roguelike.Utils.randomNumber(2, this.h - 3);
 
-		//Store the entrance location on the map
-		map.entrance = {
-			x: this.x1 + positionX,
-			y: this.y1 + positionY
-		};
+		//Translate these values to real world coordinates
+		positionX += this.x1;
+		positionY += this.y1;
+
+		//Return the position as an object
+		return {x: positionX, y: positionY};
 
 	}
 
@@ -2366,11 +2577,11 @@ function initializeCanvas() {
 		tilesX: 60, //The number of horizontal tiles on this map
 		tilesY: 40, //The number of vertical tiles on this map
 		tileSize: 25, //The width and height of a single tile
-		maxRooms: 10, //The maximum number of rooms on this map
+		maxRooms: 15, //The maximum number of rooms on this map
 		minRoomWidth: 6, //The minimum width of a single room
-		maxRoomWidth: 12, //The maximum width of a single room
+		maxRoomWidth: 10, //The maximum width of a single room
 		minRoomHeight: 6, //The minimum height of a single room
-		maxRoomHeight: 12, //The maximum height of a single room
+		maxRoomHeight: 10, //The maximum height of a single room
 		debug: false //Boolean to enable or disable the debugger
 	};
 

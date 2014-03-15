@@ -1,4 +1,4 @@
-<h1>Random Dungeon Generation V.1.6.0</h1>
+<h1>Random Dungeon Generation V.1.6.5</h1>
 
 A random dungeon generator i am creating purely in javascript on canvas! 
 
@@ -11,6 +11,7 @@ Features:
 - Fog of War!
 - Field of view for the player
 - Configurable settings
+- A component entity system
 
 What's next?
 
