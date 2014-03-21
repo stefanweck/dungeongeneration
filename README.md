@@ -1,6 +1,6 @@
-<h1>Random Dungeon Generation V.1.6.5</h1>
+<h1>Random Dungeon Generation V.1.7.0</h1>
 
-A random dungeon generator i am creating purely in javascript on canvas! 
+A roguelike game with a random dungeon generator i am creating purely in javascript on canvas!
 
 Features:
 - Random Dungeon Generation ( Surprise! )
@@ -12,16 +12,18 @@ Features:
 - Field of view for the player
 - Configurable settings
 - A component entity system
+- Turns
+- Interaction with objects, such as doors
 
 What's next?
 
-- Turns
-- Interaction with objects, such as doors
 - Different types of rooms
 - Monsters, enemies
 - Looting
 - Treasures
 - Path finding
+- User Interface
+- Text log with actions/events
 - And more!
 
 <h1>Demo</h1>
