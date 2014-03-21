@@ -1,4 +1,4 @@
-/*! Dungeon Generator - v1.6.5 - 2014-03-15
+/*! Dungeon Generator - v1.6.5 - 2014-03-21
 * https://github.com/stefanweck/dungeongeneration
 * Copyright (c) 2014 Stefan Weck */
 /**
@@ -64,16 +64,6 @@ Roguelike.Game = function(userSettings) {
 	this.systems = [];
 
 	/**
-	 * @property {Roguelike.Systems.Control} controlSystem - The system object that handles user input and kickstarts the game!
-	 */
-	this.controlSystem = null;
-
-	/**
-	 * @property {Roguelike.Systems.Collision} collisionSystem - The system object that handles collision between entities
-	 */
-	this.collisionSystem = null;
-
-	/**
 	 * @property {Roguelike.Camera} camera - Reference to the camera
 	 */
 	this.camera = null;
@@ -82,16 +72,6 @@ Roguelike.Game = function(userSettings) {
 	 * @property {Roguelike.Entity} player - Reference to the player object
 	 */
 	this.player = null;
-
-	/**
-	 * @property {Roguelike.LightSource} lightsource - Reference to lightsource
-	 */
-	this.lightSource = null;
-
-	/**
-	 * @property {Roguelike.Renderer} map - Reference to the current renderer
-	 */
-	this.renderer = null;
 
 	/**
 	 * @property {object} settings - The default settings
@@ -153,22 +133,6 @@ Roguelike.Game.prototype = {
 		//Create the camera object
 		this.camera = new Roguelike.Camera(this, {x: 0, y: 0});
 
-		//Add a lightsource at the player's position
-		this.lightSource = new Roguelike.LightSource(
-			this,
-			{
-				radius: 8,
-				gradient: true
-			}
-		);
-
-		//Initialize the static systems
-		this.controlSystem = new Roguelike.Systems.Control(this);
-		this.collisionSystem = new Roguelike.Systems.Collision(this);
-
-		//Add all other systems to the game
-		this.systems.push(new Roguelike.Systems.Render(this));
-
 		//Create the player entity
 		this.player = new Roguelike.Entity();
 
@@ -181,8 +145,11 @@ Roguelike.Game.prototype = {
 		//The player has a sprite ( color for now )
 		this.player.addComponent(new Roguelike.Components.Sprite("#FF7300"));
 
-		//The player must be controllable by the keyboard
+		//The player must be controllable by the keyboards arrow keys
 		this.player.addComponent(new Roguelike.Components.KeyboardControl());
+
+		//Add a lightsource to the player
+		this.player.addComponent(new Roguelike.Components.LightSource(true, 6));
 
 		//Add the player to the entities list of the current map
 		this.map.entities.addEntity(this.player);
@@ -190,8 +157,12 @@ Roguelike.Game.prototype = {
 		//Let the camera follow the player entity
 		this.camera.follow(this.player, this.settings.canvas.width / 2, this.settings.canvas.height / 2);
 
-		//Draw the map on canvas
-		this.renderer = new Roguelike.Renderer(this);
+		//Add all systems to the game
+		this.systems.push(new Roguelike.Systems.Collision(this));
+		this.systems.push(new Roguelike.Systems.Open(this));
+		this.systems.push(new Roguelike.Systems.Control(this));
+		this.systems.push(new Roguelike.Systems.LightMap(this));
+		this.systems.push(new Roguelike.Systems.Render(this));
 
 		//Update the game for the first time
 		this.update();
@@ -208,161 +179,43 @@ Roguelike.Game.prototype = {
 	 */
 	update: function() {
 
-		//Get the players position
-		var playerPosition = this.player.getComponent("position");
-
-		//Update the lightsource
-		var newLight = this.lightSource.update(playerPosition.x, playerPosition.y);
-
-		//Update the tiles on the map with the new light levels
-		for(var i = 0; i < newLight.length; i++) {
-			this.map.tiles[newLight[i].y][newLight[i].x].lightLevel = newLight[i].lightLevel;
-			this.map.tiles[newLight[i].y][newLight[i].x].explored = true;
-		}
-
-		//Update the camera
-		this.camera.update();
-
-		//Render the changes
-		this.renderer.clear();
-		this.renderer.drawMap();
-
 		//Update each system
 		for(var s = 0; s < this.systems.length; s++){
 			this.systems[s].update();
 		}
 
-		this.renderer.drawLightMap();
-
 	}
 
 };
 
-Roguelike.Renderer = function(game) {
+var CustomRandom = function(nseed) {
 
-	/**
-	 * @property {Roguelike.Game} game - Reference to the current game object
-	 */
-	this.game = game;
+	var seed = nseed;
+	var constant = Math.pow(2, 13)+1;
+	var prime = 1987;
+	var maximum = 1000;
 
-	/**
-	 * @property {object} canvas - Reference to the canvas object everything is drawn on
-	 */
-	this.canvas = game.settings.canvas;
+	return {
+		next : function(min, max) {
 
-	/**
-	 * @property {object} canvas - The 2D context of the current canvas object
-	 */
-	this.context = game.settings.canvas.getContext("2d");
+			while (seed > constant) seed = seed/prime;
 
-	/**
-	 * @property {array} tileColors - Contains all the default colors for the tiles
-	 */
-	this.tileColors = ['#302222', '#443939', '#6B5B45'];
+			seed *= constant;
+			seed += prime;
 
-};
-
-Roguelike.Renderer.prototype = {
-
-	/**
-	 * Draw the current map onto the canvas
-	 * @protected
-	 */
-	drawMap: function() {
-
-		//Save the context to push a copy of our current drawing state onto our drawing state stack
-		this.context.save();
-
-		//Loop through every horizontal row
-		for(var y = 0; y < this.game.map.tilesY; y++) {
-
-			//Loop through every vertical row
-			for(var x = 0; x < this.game.map.tilesX; x++) {
-
-				//Get the type of the current tile
-				var tileType = this.game.map.tiles[y][x].type;
-
-				//Get the corresponding color of this tile from the array of colors
-				this.context.fillStyle = this.tileColors[tileType];
-
-				//Get the size of one tile to determine how big each rectangle is
-				var tileSize = this.game.map.tileSize;
-
-				//Create a rectangle!
-				this.context.fillRect(
-					//Get the current position of the tile, and check where it is in the camera's viewport
-					(x * tileSize) - this.game.camera.position.x,
-					(y * tileSize) - this.game.camera.position.y,
-					tileSize,
-					tileSize
-				);
-
-			}
-
+			return min && max ? min+seed%maximum/maximum*(max-min) : seed%maximum/maximum;
 		}
-
-		//Pop the last saved drawing state off of the drawing state stack
-		this.context.restore();
-
-	},
-
-	drawLightMap: function() {
-
-		//Save the context to push a copy of our current drawing state onto our drawing state stack
-		this.context.save();
-
-		//Loop through every horizontal row
-		for(var y = 0; y < this.game.map.tilesY; y++) {
-
-			//Loop through every vertical row
-			for(var x = 0; x < this.game.map.tilesX; x++) {
-
-				//Draw the lightmap
-				if(this.game.map.tiles[y][x].explored === true && 1 - this.game.map.tiles[y][x].lightLevel > 0.7) {
-
-					this.context.fillStyle = "rgba(0, 0, 0, 0.7)";
-
-				}else{
-
-					this.context.fillStyle = "rgba(0, 0, 0, " + (1 - this.game.map.tiles[y][x].lightLevel) + ")";
-
-				}
-
-				//Get the size of one tile to determine how big each rectangle is
-				var tileSize = this.game.map.tileSize;
-
-				//Create a rectangle!
-				this.context.fillRect(
-					//Get the current position of the tile, and check where it is in the camera's viewport
-					(x * tileSize) - this.game.camera.position.x,
-					(y * tileSize) - this.game.camera.position.y,
-					tileSize,
-					tileSize
-				);
-
-			}
-
-		}
-
-		//Pop the last saved drawing state off of the drawing state stack
-		this.context.restore();
-
-	},
-
-	/**
-	 * Function to clear the canvas
-	 * @protected
-	 *
-	 */
-	clear: function() {
-
-		//Clear the entire canvas
-		this.context.clearRect(0, 0, this.game.settings.canvas.width, this.game.settings.canvas.height);
-
 	}
-
 };
 
+var rng = CustomRandom(219743);
+//use '42343' as a seed
+
+/**
+ * @class Roguelike.Utils
+ * @classdesc In this class are the functions stored that are being
+ * used in other functions
+ */
 Roguelike.Utils = {
 
 	/**
@@ -372,7 +225,7 @@ Roguelike.Utils = {
 	 */
 	randomNumber: function(from, to) {
 
-		return Math.floor(Math.random() * (to - from + 1) + from);
+		return Math.floor(rng.next() * (to - from + 1) + from);
 
 	},
 
@@ -964,21 +817,103 @@ Roguelike.Components.Health.prototype = {
 
 };
 
-Roguelike.Components.Door = function() {
+Roguelike.Components.CanOpen = function() {
 
 	/**
 	 * @property {string} name - The name of this system. This field is always required!
 	 */
-	this.name = 'door';
+	this.name = 'canOpen';
+
+	/**
+	 * @property {Roguelike.Event} events - Event holder
+	 */
+	this.events = new Roguelike.Event();
+
+	/**
+	 * @property {string} state - The state of this door, closed opened etc
+	 */
+	this.state = 'closed';
+
+	/**
+	 * @property {array} actions - The next actions to perform on this object
+	 */
+	this.actions = [];
+
+	//Initialize the component
+	this.initialize();
 
 };
 
-Roguelike.Components.KeyboardControl = function() {
+Roguelike.Components.CanOpen.prototype = {
+
+	initialize: function(){
+
+		//Attach the bumpInto function to the bumpInto event
+		this.events.on('bumpInto', this.bumpInto, this);
+
+	},
+
+	/**
+	 * Function to perform when something collides with this entity
+	 * @protected
+	 */
+	bumpInto: function() {
+
+		//If the door is closed, add an open action to the actions stack
+		if(this.state === 'closed'){
+
+			this.actions.push("open");
+
+		}
+
+	}
+
+};
+
+Roguelike.Components.LightSource = function(gradient, radius) {
+
+	/**
+	 * @property {string} name - The name of this system. This field is always required!
+	 */
+	this.name = 'lightSource';
+
+	/**
+	 * @property {bool} gradient - Should the lightmap be drawn with a gradient
+	 */
+	this.gradient = gradient;
+
+	/**
+	 * @property {int} radius - The radius of the light, how far does it shine it's magical light!
+	 */
+	this.radius = radius;
+
+};
+
+Roguelike.Components.Collide = function(collide) {
+
+	/**
+	 * @property {string} name - The name of this system. This field is always required!
+	 */
+	this.name = 'collide';
+
+	/**
+	 * @property {Roguelike.Event} events - Event holder
+	 */
+	this.collide = collide;
+
+};
+
+Roguelike.Components.KeyboardControl = function(leftKey, rightKey, upKey, downKey) {
 
 	/**
 	 * @property {string} name - The name of this system. This field is always required!
 	 */
 	this.name = 'keyboardControl';
+
+	/**
+	 * @property {array} actions - The next actions to perform on this object
+	 */
+	this.actions = [];
 
 };
 
@@ -1023,6 +958,11 @@ Roguelike.Systems.Render = function(game) {
 	 */
 	this.context = null;
 
+	/**
+	 * @property {array} tileColors - Contains all the default colors for the tiles
+	 */
+	this.tileColors = ['#302222', '#443939', '#6B5B45'];
+
 	//Initialize itself
 	this.initialize();
 
@@ -1045,10 +985,60 @@ Roguelike.Systems.Render.prototype = {
 	},
 
 	/**
+	 * Draw the current map onto the canvas
+	 * @protected
+	 */
+	drawMap: function() {
+
+		//Save the context to push a copy of our current drawing state onto our drawing state stack
+		this.context.save();
+
+		//Loop through every horizontal row
+		for(var y = 0; y < this.game.map.tilesY; y++) {
+
+			//Loop through every vertical row
+			for(var x = 0; x < this.game.map.tilesX; x++) {
+
+				//Get the type of the current tile
+				var tileType = this.game.map.tiles[y][x].type;
+
+				//Get the corresponding color of this tile from the array of colors
+				this.context.fillStyle = this.tileColors[tileType];
+
+				//Get the size of one tile to determine how big each rectangle is
+				var tileSize = this.game.map.tileSize;
+
+				//Create a rectangle!
+				this.context.fillRect(
+					//Get the current position of the tile, and check where it is in the camera's viewport
+					(x * tileSize) - this.game.camera.position.x,
+					(y * tileSize) - this.game.camera.position.y,
+					tileSize,
+					tileSize
+				);
+
+			}
+
+		}
+
+		//Pop the last saved drawing state off of the drawing state stack
+		this.context.restore();
+
+	},
+
+	/**
 	 * Function that gets called when the game continues one tick
 	 * @protected
 	 */
 	update: function() {
+
+		//Update the camera
+		//TODO: Move this outta here!
+		this.game.camera.update();
+
+		//Clear the canvas and draw the map
+		this.clear();
+		this.drawMap();
 
 		//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
 		var entities = this.game.map.entities.getEntities("position", "sprite");
@@ -1078,6 +1068,320 @@ Roguelike.Systems.Render.prototype = {
 
 		//Pop the last saved drawing state off of the drawing state stack
 		this.context.restore();
+
+		//Draw the lightmap
+		this.drawLightMap();
+
+	},
+
+	drawLightMap: function() {
+
+		//Save the context to push a copy of our current drawing state onto our drawing state stack
+		this.context.save();
+
+		//Loop through every horizontal row
+		for(var y = 0; y < this.game.map.tilesY; y++) {
+
+			//Loop through every vertical row
+			for(var x = 0; x < this.game.map.tilesX; x++) {
+
+				//Draw the lightmap
+				if(this.game.map.tiles[y][x].explored === true && 1 - this.game.map.tiles[y][x].lightLevel > 0.7) {
+
+					this.context.fillStyle = "rgba(0, 0, 0, 0.7)";
+
+				}else{
+
+					this.context.fillStyle = "rgba(0, 0, 0, " + (1 - this.game.map.tiles[y][x].lightLevel) + ")";
+
+				}
+
+				//Get the size of one tile to determine how big each rectangle is
+				var tileSize = this.game.map.tileSize;
+
+				//Create a rectangle!
+				this.context.fillRect(
+					//Get the current position of the tile, and check where it is in the camera's viewport
+					(x * tileSize) - this.game.camera.position.x,
+					(y * tileSize) - this.game.camera.position.y,
+					tileSize,
+					tileSize
+				);
+
+			}
+
+		}
+
+		//Pop the last saved drawing state off of the drawing state stack
+		this.context.restore();
+
+	},
+
+	/**
+	 * Function to clear the canvas
+	 * @protected
+	 *
+	 */
+	clear: function() {
+
+		//Clear the entire canvas
+		this.context.clearRect(0, 0, this.game.settings.canvas.width, this.game.settings.canvas.height);
+
+	}
+
+};
+
+Roguelike.Systems.Open = function(game) {
+
+	/**
+	 * @property {string} name - The name of this system. This field is always required!
+	 */
+	this.name = 'open';
+
+	/**
+	 * @property {Roguelike.Game} game - Reference to the current game object
+	 */
+	this.game = game;
+
+};
+
+Roguelike.Systems.Open.prototype = {
+
+	/**
+	 * Function that gets called when the game continues one tick
+	 * @protected
+	 */
+	update: function() {
+
+		//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
+		var entities = this.game.map.entities.getEntities("canOpen", "sprite", "position", "collide");
+
+		//Loop through all matching entities
+		for(var i = 0; i < entities.length; i++){
+
+			//Get the components from the current entity and store them temporarily in a variable
+			var canOpenComponent = entities[i].getComponent("canOpen");
+			var spriteComponent = entities[i].getComponent("sprite");
+			var positionComponent = entities[i].getComponent("position");
+			var collideComponent = entities[i].getComponent("collide");
+
+			//Check if any actions need to be performed on this openable entity
+			if(canOpenComponent.actions.length !== 0){
+
+				//Loop through the actions
+				for(var a = canOpenComponent.actions.length; a >= 0; a--){
+
+					//Pop the action from the "stack"
+					var currentAction = canOpenComponent.actions.pop();
+
+					//Action to open the door
+					if(currentAction === "open"){
+
+						//Change the door's state to open
+						canOpenComponent.state = "open";
+
+						//Change the sprite to open
+						spriteComponent.color = "#ccc";
+
+						//Make sure the collide component doesn't say it collides anymore
+						collideComponent.collide = false;
+
+						//Make sure the tile that this openable entity is on doesn't block light anymore
+						this.game.map.tiles[positionComponent.y][positionComponent.x].blockLight = false;
+
+					}
+
+				}
+
+			}
+
+		}
+
+	}
+
+};
+
+Roguelike.Systems.LightMap = function(game) {
+
+	/**
+	 * @property {string} name - The name of this system. This field is always required!
+	 */
+	this.name = 'lightMap';
+
+	/**
+	 * @property {Roguelike.Game} game - Reference to the current game object
+	 */
+	this.game = game;
+
+	/**
+	 * @property {object} mapSize - The size of the current map
+	 */
+	this.mapSize = {x: game.map.tilesX, y: game.map.tilesY};
+
+	/**
+	 * @property {object} tiles - Object that is being used to store tile data before returning it
+	 */
+	this.tiles = [];
+
+	/**
+	 * @property {array} mult - Multipliers for transforming coordinates into other octants
+	 */
+	this.mult = [
+		[1, 0, 0, -1, -1, 0, 0, 1],
+		[0, 1, -1, 0, 0, -1, 1, 0],
+		[0, 1, 1, 0, 0, -1, -1, 0],
+		[1, 0, 0, 1, -1, 0, 0, -1]
+	];
+
+};
+
+Roguelike.Systems.LightMap.prototype = {
+
+	/**
+	 * Function that checks if a tile blocks light or not
+	 * @protected
+	 *
+	 * @param {int} x - The X position of the tile
+	 * @param {int} y - The Y position of the tile
+	 */
+	doesTileBlock: function(x, y) {
+		return this.game.map.tiles[y][x].blockLight;
+	},
+
+	calculateOctant: function(position, row, start, end, lightsource, xx, xy, yx, yy, id) {
+		this.tiles.push({
+			x: position.x,
+			y: position.y,
+			lightLevel: 0
+		});
+
+		var new_start = 0;
+
+		if(start < end) return;
+
+		var radius_squared = lightsource.radius * lightsource.radius;
+
+		for(var i = row; i < lightsource.radius + 1; i++) {
+			var dx = -i - 1;
+			var dy = -i;
+
+			var blocked = false;
+
+			while(dx <= 0) {
+
+				dx += 1;
+
+				var X = position.x + dx * xx + dy * xy;
+				var Y = position.y + dx * yx + dy * yy;
+
+				if(X < this.mapSize.x && X >= 0 && Y < this.mapSize.y && Y >= 0) {
+
+					var l_slope = (dx - 0.5) / (dy + 0.5);
+					var r_slope = (dx + 0.5) / (dy - 0.5);
+
+					if(start < r_slope) {
+						continue;
+					}else if(end > l_slope) {
+						break;
+					}else{
+						if(dx * dx + dy * dy < radius_squared) {
+							var pos1 = new Roguelike.Vector2(X, Y);
+							var pos2 = position;
+							var d = (pos1.x - pos2.x) * (pos1.x - pos2.x) + (pos1.y - pos2.y) * (pos1.y - pos2.y);
+
+							this.tiles.push({
+								x: X,
+								y: Y,
+								lightLevel: (lightsource.gradient === false) ? 1 : (1 - (d / (lightsource.radius * lightsource.radius)))
+							});
+						}
+
+						if(blocked) {
+							if(this.doesTileBlock(X, Y)) {
+								new_start = r_slope;
+								continue;
+							}else{
+								blocked = false;
+								start = new_start;
+							}
+						}else{
+							if(this.doesTileBlock(X, Y) && i < lightsource.radius) {
+								blocked = true;
+								this.calculateOctant(position, i + 1, start, l_slope, lightsource, xx, xy, yx, yy, id + 1);
+
+								new_start = r_slope;
+							}
+						}
+					}
+				}
+			}
+
+			if(blocked) break;
+		}
+	},
+
+	/**
+	 * Sets flag lit to false on all tiles within radius of position specified
+	 * @protected
+	 */
+	clear: function() {
+		var i = this.tiles.length;
+		while(i--) {
+			this.tiles[i].lightLevel = 0;
+		}
+
+		var o = this.tiles;
+		this.tiles = [];
+		return o;
+	},
+
+	/**
+	 * Calculate the new lightning from this lightsource
+	 * @protected
+	 */
+	calculate: function(lightSource, position) {
+		for(var i = 0; i < 8; i++) {
+			this.calculateOctant(position, 1, 1.0, 0.0, lightSource,
+				this.mult[0][i], this.mult[1][i], this.mult[2][i], this.mult[3][i], 0);
+		}
+
+		//Push this tile and it's light level's in the tiles array
+		this.tiles.push({
+			x: position.x,
+			y: position.y,
+			lightLevel: 1
+		});
+
+		//Return the tiles
+		return this.tiles;
+	},
+
+	/**
+	 * Function that gets called when the game continues one tick
+	 * @protected
+	 */
+	update: function(){
+
+		//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
+		var entities = this.game.map.entities.getEntities("lightSource", "position");
+
+		//Loop through all matching entities
+		for(var i = 0; i < entities.length; i++){
+
+			//Get the keyboardControl component
+			var lightSourceComponent = entities[i].getComponent("lightSource");
+			var positionComponent = entities[i].getComponent("position");
+
+			//Update the lightsource
+			var newLight = this.clear().concat(this.calculate(lightSourceComponent, positionComponent));
+
+			//Update the tiles on the map with the new light levels
+			for(var l = 0; l < newLight.length; l++) {
+				this.game.map.tiles[newLight[l].y][newLight[l].x].lightLevel = newLight[l].lightLevel;
+				this.game.map.tiles[newLight[l].y][newLight[l].x].explored = true;
+			}
+
+		}
 
 	}
 
@@ -1145,7 +1449,7 @@ Roguelike.Systems.Control.prototype = {
 
 		//Function to perform
 		var moveUp = function() {
-			_this.moveEntities('up');
+			_this.queueMovement(38);
 		};
 
 		//Attach the function to the keydown event
@@ -1156,7 +1460,7 @@ Roguelike.Systems.Control.prototype = {
 
 		//Function to perform
 		var moveDown = function() {
-			_this.moveEntities('down');
+			_this.queueMovement(40);
 		};
 
 		//Attach the function to the keydown event
@@ -1167,7 +1471,7 @@ Roguelike.Systems.Control.prototype = {
 
 		//Function to perform
 		var moveLeft = function() {
-			_this.moveEntities('left');
+			_this.queueMovement(37);
 		};
 
 		//Attach the function to the keydown event
@@ -1178,7 +1482,7 @@ Roguelike.Systems.Control.prototype = {
 
 		//Function to perform
 		var moveRight = function() {
-			_this.moveEntities('right');
+			_this.queueMovement(39);
 		};
 
 		//Attach the function to the keydown event
@@ -1186,13 +1490,7 @@ Roguelike.Systems.Control.prototype = {
 
 	},
 
-	/**
-	 * Function that gets called when the user pressed one of the arrow keys
-	 * @protected
-	 *
-	 * @param {string} direction - The direction the entities are being moved
-	 */
-	moveEntities: function(direction) {
+	queueMovement: function(key){
 
 		//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
 		var entities = this.game.map.entities.getEntities("keyboardControl", "position");
@@ -1200,13 +1498,46 @@ Roguelike.Systems.Control.prototype = {
 		//Loop through all matching entities
 		for(var i = 0; i < entities.length; i++){
 
-			//Move the current entity
-			this.moveEntity(direction, entities[i]);
+			//Get the keyboardControl component
+			var keyboardControlComponent = entities[i].getComponent("keyboardControl");
+
+			//Add this direction to it's movement queue
+			keyboardControlComponent.actions.push(key);
 
 		}
 
-		//All the entities are moved, it's time to update the other game mechanics
+		//All the entities movements are queued, it's time to update the other game mechanics
 		this.game.update();
+
+	},
+
+	/**
+	 * Function that gets called when the game continues one tick
+	 * @protected
+	 */
+	update: function(){
+
+		//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
+		var entities = this.game.map.entities.getEntities("keyboardControl", "position");
+
+		//Loop through all matching entities
+		for(var i = 0; i < entities.length; i++){
+
+			//Get the keyboardControl component
+			var keyboardControlComponent = entities[i].getComponent("keyboardControl");
+
+			//Loop through the actions
+			for(var a = keyboardControlComponent.actions.length - 1; a >= 0; a--){
+
+				//Pop the action from the "stack"
+				var currentAction = keyboardControlComponent.actions.pop();
+
+				//Move the current entity to the current action
+				this.moveEntity(currentAction, entities[i]);
+
+			}
+
+		}
 
 	},
 
@@ -1222,57 +1553,30 @@ Roguelike.Systems.Control.prototype = {
 		//Get the current entities position component
 		var entityPosition = entity.getComponent("position");
 
-		//Declare the new position variable
-		var newPosition = {};
-
 		//Check which controls are being pressed and update the player accordingly
 		switch(direction){
 
-			case ('left'):
+			case (37): //Left
 
-				newPosition = {x: entityPosition.x - 1, y: entityPosition.y};
-
-				if(this.game.collisionSystem.canMove(entity, newPosition)){
-
-					entityPosition.x -= 1;
-
-				}
+				entityPosition.x -= 1;
 
 			break;
 
-			case ('up'):
+			case (38): //Up
 
-				newPosition = {x: entityPosition.x, y: entityPosition.y - 1};
-
-				if(this.game.collisionSystem.canMove(entity, newPosition)){
-
-					entityPosition.y -= 1;
-
-				}
+				entityPosition.y -= 1;
 
 			break;
 
-			case ('right'):
+			case (39): //Right
 
-				newPosition = {x: entityPosition.x + 1, y: entityPosition.y};
-
-				if(this.game.collisionSystem.canMove(entity, newPosition)){
-
-					entityPosition.x += 1;
-
-				}
+				entityPosition.x += 1;
 
 			break;
 
-			case ('down'):
+			case (40): //Down
 
-				newPosition = {x: entityPosition.x, y: entityPosition.y + 1};
-
-				if(this.game.collisionSystem.canMove(entity, newPosition)){
-
-					entityPosition.y += 1;
-
-				}
+				entityPosition.y += 1;
 
 			break;
 
@@ -1299,6 +1603,72 @@ Roguelike.Systems.Collision = function(game) {
 Roguelike.Systems.Collision.prototype = {
 
 	/**
+	 * Function that gets called when the game continues one tick
+	 * @protected
+	 */
+	update: function(){
+
+		//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
+		var entities = this.game.map.entities.getEntities("keyboardControl", "position");
+
+		//Loop through all matching entities
+		for(var i = 0; i < entities.length; i++){
+
+			//Get the keyboardControl component
+			var keyboardControlComponent = entities[i].getComponent("keyboardControl");
+			var positionComponent = entities[i].getComponent("position");
+
+			//Loop through the actions
+			for(var a = keyboardControlComponent.actions.length - 1; a >= 0; a--){
+
+				//Pop the action from the "stack"
+				var currentAction = keyboardControlComponent.actions[a];
+
+				var newPosition;
+
+				switch(currentAction){
+
+					case (37): //Left
+
+						newPosition = {x: positionComponent.x - 1, y: positionComponent.y};
+
+					break;
+
+					case (39): //Right
+
+						newPosition = {x: positionComponent.x + 1, y: positionComponent.y};
+
+					break;
+
+					case (38): //Down
+
+						newPosition = {x: positionComponent.x, y: positionComponent.y - 1};
+
+					break;
+
+					case (40): //Up
+
+						newPosition = {x: positionComponent.x, y: positionComponent.y + 1};
+
+					break;
+
+				}
+
+				//Check if the new position is correct
+				if(!this.canMove(entities[i], newPosition)){
+
+					//The new position is invalid, remove the action from the queue
+					keyboardControlComponent.actions.splice(a, 1);
+
+				}
+
+			}
+
+		}
+
+	},
+
+	/**
 	 * Function that gets called when an entity wants to move
 	 * @protected
 	 *
@@ -1317,7 +1687,38 @@ Roguelike.Systems.Collision.prototype = {
 
 		//Check if there is one or more than one entity at the new location
 		if(nextTile.entities.length !== 0){
-			console.log(nextTile.entities);
+
+			//Loop through the entities
+			for(var i = 0; i < nextTile.entities.length; i++){
+
+				//Loop through the components
+				for (var key in nextTile.entities[i].components) {
+
+					//Check if the component has an events parameter
+					if(typeof nextTile.entities[i].components[key].events !== "undefined"){
+
+						//Trigger the specified event
+						nextTile.entities[i].components[key].events.trigger("bumpInto");
+
+					}
+
+				}
+
+				//Check if the entity has a collide component
+				if(nextTile.entities[i].hasComponent("collide")){
+
+
+					//Get the collide component
+					var collideComponent = nextTile.entities[i].getComponent("collide");
+					if(collideComponent.collide === true){
+						return false;
+					}
+
+				}
+
+
+			}
+
 		}
 
 		//Function made it all the way down here, that means the entity is able to move to the new position
@@ -1641,10 +2042,6 @@ Roguelike.Tile = function(type, blockLight, room) {
 	 * @property {bool} explored - Boolean if a tile has already been explorer by the player
 	 */
 	this.explored = false;
-
-};
-
-Roguelike.Tile.prototype = {
 
 };
 
@@ -2140,7 +2537,7 @@ Roguelike.MapFactory.prototype = {
 			var randomNumber = Roguelike.Utils.randomNumber(0, 100);
 
 			//If the tiles left and right are walls and the tiles above and below are floors
-			if(tileLeft.type === 1 && tileRight.type === 1 && tileUp.entities.length === 0 && tileDown.entities.length === 0 && tileUp.type === 2 && tileDown.type === 2 && randomNumber > 60){
+			if(tileLeft.type === 1 && tileRight.type === 1 && tileUp.entities.length === 0 && tileDown.entities.length === 0 && tileUp.type === 2 && tileDown.type === 2 && randomNumber > 80){
 
 				//Place a door at this location
 				this.placeDoor(doorLocation);
@@ -2172,6 +2569,8 @@ Roguelike.MapFactory.prototype = {
 		//Add components to the door entity
 		doorEntity.addComponent(new Roguelike.Components.Position(position.x, position.y));
 		doorEntity.addComponent(new Roguelike.Components.Sprite("#FFD900"));
+		doorEntity.addComponent(new Roguelike.Components.CanOpen());
+		doorEntity.addComponent(new Roguelike.Components.Collide(true));
 
 		//Add the entity to the map
 		this.game.map.entities.addEntity(doorEntity);
@@ -2190,13 +2589,14 @@ Roguelike.MapFactory.prototype = {
 	 */
 	placeEntranceExitObjects: function() {
 
-		//Generate a random number between 0 and the number of rooms - 1
-		//Minus one because then we can select the next room in the list as the exit room
-		var randomRoomIndex = Roguelike.Utils.randomNumber(0, this.game.map.rooms.length - 1);
+		//Generate a random number between 0 and the number of rooms - 2
+		//Minus two because then we can select the last room in the list as an exit room
+		var entranceRoomIndex = Roguelike.Utils.randomNumber(0, this.game.map.rooms.length - 2);
+		var exitRoomIndex = this.game.map.rooms.length - 1;
 
 		//Get the rooms from the room list
-		var entranceRoom = this.game.map.rooms[randomRoomIndex];
-		var exitRoom = this.game.map.rooms[randomRoomIndex + 1];
+		var entranceRoom = this.game.map.rooms[entranceRoomIndex];
+		var exitRoom = this.game.map.rooms[exitRoomIndex];
 
 		//Let the rooms return a random tile
 		var entrancePosition = entranceRoom.getRandomPosition();
@@ -2366,195 +2766,6 @@ Roguelike.Room.prototype = {
 		//Return the position as an object
 		return {x: positionX, y: positionY};
 
-	}
-
-};
-
-Roguelike.LightSource = function(game, options) {
-
-	/**
-	 * @property {Roguelike.Game} game - Reference to the current game object
-	 */
-	this.game = game;
-
-	/**
-	 * @property {bool} gradient - Should the lightmap be drawn with a gradient
-	 */
-	this.gradient = options.gradient;
-
-	/**
-	 * @property {object} mapSize - The size of the current map
-	 */
-	this.mapSize = {x: game.map.tilesX, y: game.map.tilesY};
-
-	/**
-	 * @property {object} tiles - Object that is being used to store tile data before returning it
-	 */
-	this.tiles = [];
-
-	/**
-	 * @property {object} position - The current position of the light source
-	 */
-	this.position = new Roguelike.Vector2(-1, -1);
-
-	/**
-	 * @property {int} radius - The radius of the light, how far does it shine it's magical light!
-	 */
-	this.radius = options.radius;
-
-	/**
-	 * @property {object} oldRadius
-	 */
-	this.oldRadius = options.radius;
-
-	/**
-	 * @property {array} mult - Multipliers for transforming coordinates into other octants
-	 */
-	this.mult = [
-		[1, 0, 0, -1, -1, 0, 0, 1],
-		[0, 1, -1, 0, 0, -1, 1, 0],
-		[0, 1, 1, 0, 0, -1, -1, 0],
-		[1, 0, 0, 1, -1, 0, 0, -1]
-	];
-
-
-};
-
-Roguelike.LightSource.prototype = {
-
-	/**
-	 * Function that checks if a tile blocks light or not
-	 * @protected
-	 *
-	 * @param {int} x - The X position of the tile
-	 * @param {int} y - The Y position of the tile
-	 */
-	doesTileBlock: function(x, y) {
-		return this.game.map.tiles[y][x].blockLight;
-	},
-
-	/**
-	 * Calculates an octant. Called by the this.calculate when calculating lighting
-	 * @protected
-	 */
-	calculateOctant: function(cx, cy, row, start, end, radius, xx, xy, yx, yy, id) {
-		this.tiles.push({
-			x: cx,
-			y: cy,
-			lightLevel: 0
-		});
-
-		var new_start = 0;
-
-		if(start < end) return;
-
-		var radius_squared = radius * radius;
-
-		for(var i = row; i < radius + 1; i++) {
-			var dx = -i - 1;
-			var dy = -i;
-
-			var blocked = false;
-
-			while(dx <= 0) {
-
-				dx += 1;
-
-				var X = cx + dx * xx + dy * xy;
-				var Y = cy + dx * yx + dy * yy;
-
-				if(X < this.mapSize.x && X >= 0 && Y < this.mapSize.y && Y >= 0) {
-
-					var l_slope = (dx - 0.5) / (dy + 0.5);
-					var r_slope = (dx + 0.5) / (dy - 0.5);
-
-					if(start < r_slope) {
-						continue;
-					}else if(end > l_slope) {
-						break;
-					}else{
-						if(dx * dx + dy * dy < radius_squared) {
-							var pos1 = new Roguelike.Vector2(X, Y);
-							var pos2 = this.position;
-							var d = (pos1.x - pos2.x) * (pos1.x - pos2.x) + (pos1.y - pos2.y) * (pos1.y - pos2.y);
-
-							this.tiles.push({
-								x: X,
-								y: Y,
-								lightLevel: (this.gradient === false) ? 1 : (1 - (d / (this.radius * this.radius)))
-							});
-						}
-
-						if(blocked) {
-							if(this.doesTileBlock(X, Y)) {
-								new_start = r_slope;
-								continue;
-							}else{
-								blocked = false;
-								start = new_start;
-							}
-						}else{
-							if(this.doesTileBlock(X, Y) && i < radius) {
-								blocked = true;
-								this.calculateOctant(cx, cy, i + 1, start, l_slope, this.radius, xx, xy, yx, yy, id + 1);
-
-								new_start = r_slope;
-							}
-						}
-					}
-				}
-			}
-
-			if(blocked) break;
-		}
-	},
-
-	/**
-	 * Sets flag lit to false on all tiles within radius of position specified
-	 * @protected
-	 */
-	clear: function() {
-		var i = this.tiles.length;
-		while(i--) {
-			this.tiles[i].lightLevel = 0;
-		}
-
-		var o = this.tiles;
-		this.tiles = [];
-		return o;
-	},
-
-	/**
-	 * Calculate the new lightning from this lightsource
-	 * @protected
-	 */
-	calculate: function() {
-		for(var i = 0; i < 8; i++) {
-			this.calculateOctant(this.position.x, this.position.y, 1, 1.0, 0.0, this.radius,
-				this.mult[0][i], this.mult[1][i], this.mult[2][i], this.mult[3][i], 0);
-		}
-
-		//Push this tile and it's light level's in the tiles array
-		this.tiles.push({
-			x: this.position.x,
-			y: this.position.y,
-			lightLevel: 1
-		});
-
-		//Return the tiles
-		return this.tiles;
-	},
-
-	/**
-	 * Update the position of the lightsource and calculate light again
-	 * @protected
-	 *
-	 * @param {int} x - The X position of the lightsource
-	 * @param {int} y - The Y position of the lightsource
-	 */
-	update: function(x, y) {
-		this.position = new Roguelike.Vector2(x, y);
-		return this.clear().concat(this.calculate());
 	}
 
 };
