@@ -1,10 +1,10 @@
-/*! Dungeon Generator - v1.6.5 - 2014-03-21
+/*! Dungeon Generator - v1.7.0 - 2014-03-21
 * https://github.com/stefanweck/dungeongeneration
 * Copyright (c) 2014 Stefan Weck */
 /**
  * Roguelike javascript game with HTML5's canvas
  *
- * v.1.6.5 - Build on: 15 March 2014
+ * v.1.7.0 - Build on: 21 March 2014
  *
  * Features:
  * - Random Dungeon Generation ( Surprise! )
@@ -16,16 +16,18 @@
  * - Field of view for the player
  * - Configurable settings
  * - A component entity system
+ * - Turns
+ * - Interaction with objects, such as doors
  *
  * What's next?
  *
- * - Turns
- * - Interaction with objects, such as doors
  * - Different types of rooms
  * - Monsters, enemies
  * - Looting
  * - Treasures
  * - Path finding
+ * - User Interface
+ * - Text log with actions/events
  * - And more!
  *
  */
@@ -36,7 +38,7 @@
 var Roguelike = Roguelike || {
 
 	//Details, version etc
-	VERSION: '1.6.5',
+	VERSION: '1.7.0',
 
 	//Holder for all the game's available components
 	Components: {},
@@ -179,9 +181,12 @@ Roguelike.Game.prototype = {
 	 */
 	update: function() {
 
-		//Update each system
-		for(var s = 0; s < this.systems.length; s++){
+		//Loop through each system
+		for(var s = 0; s < this.systems.length; s++) {
+
+			//Update the current system
 			this.systems[s].update();
+
 		}
 
 	}
@@ -191,24 +196,24 @@ Roguelike.Game.prototype = {
 var CustomRandom = function(nseed) {
 
 	var seed = nseed;
-	var constant = Math.pow(2, 13)+1;
+	var constant = Math.pow(2, 13) + 1;
 	var prime = 1987;
 	var maximum = 1000;
 
 	return {
-		next : function(min, max) {
+		next: function(min, max) {
 
-			while (seed > constant) seed = seed/prime;
+			while(seed > constant) seed = seed / prime;
 
 			seed *= constant;
 			seed += prime;
 
-			return min && max ? min+seed%maximum/maximum*(max-min) : seed%maximum/maximum;
+			return min && max ? min + seed % maximum / maximum * (max - min) : seed % maximum / maximum;
 		}
 	}
 };
 
-var rng = CustomRandom(219743);
+var rng = CustomRandom(42343);
 //use '42343' as a seed
 
 /**
@@ -672,7 +677,7 @@ Roguelike.Entity.prototype = {
 		//Trigger the RemoveComponent event
 		this.onRemoveComponent.trigger(component);
 
-	},
+	}
 
 };
 
@@ -741,17 +746,17 @@ Roguelike.Group.prototype = {
 		var entitiesMatch = [];
 
 		//Loop through each entity in this group
-		for(var i = 0; i < this.entities.length; i++){
+		for(var i = 0; i < this.entities.length; i++) {
 
 			//Initialize an empty array
 			var isThere = [];
 
 			//Loop through the arguments
-			for(var a = 0; a < arguments.length; a++){
+			for(var a = 0; a < arguments.length; a++) {
 
 				//If the current entity has the specified component. Push a random
 				//value into the isThere array for later checks
-				if(this.entities[i].components[arguments[a]]){
+				if(this.entities[i].components[arguments[a]]) {
 					isThere.push(1);
 				}
 
@@ -759,7 +764,7 @@ Roguelike.Group.prototype = {
 
 			//If there are as many matches as supplied arguments, every component
 			//is available within this entity
-			if(isThere.length === arguments.length){
+			if(isThere.length === arguments.length) {
 
 				//Push the current entity into the array that is returned
 				entitiesMatch.push(this.entities[i]);
@@ -846,7 +851,12 @@ Roguelike.Components.CanOpen = function() {
 
 Roguelike.Components.CanOpen.prototype = {
 
-	initialize: function(){
+	/**
+	 * The 'constructor' for this component
+	 * Adds the bump into function to the event list
+	 * @protected
+	 */
+	initialize: function() {
 
 		//Attach the bumpInto function to the bumpInto event
 		this.events.on('bumpInto', this.bumpInto, this);
@@ -860,7 +870,7 @@ Roguelike.Components.CanOpen.prototype = {
 	bumpInto: function() {
 
 		//If the door is closed, add an open action to the actions stack
-		if(this.state === 'closed'){
+		if(this.state === 'closed') {
 
 			this.actions.push("open");
 
@@ -903,7 +913,7 @@ Roguelike.Components.Collide = function(collide) {
 
 };
 
-Roguelike.Components.KeyboardControl = function(leftKey, rightKey, upKey, downKey) {
+Roguelike.Components.KeyboardControl = function() {
 
 	/**
 	 * @property {string} name - The name of this system. This field is always required!
@@ -939,11 +949,6 @@ Roguelike.Components.Position = function(x, y) {
 Roguelike.Systems.Render = function(game) {
 
 	/**
-	 * @property {string} name - The name of this system. This field is always required!
-	 */
-	this.name = 'renderer';
-
-	/**
 	 * @property {Roguelike.Game} game - Reference to the current game object
 	 */
 	this.game = game;
@@ -971,7 +976,8 @@ Roguelike.Systems.Render = function(game) {
 Roguelike.Systems.Render.prototype = {
 
 	/**
-	 * Initialize the system, create all objects and variables
+	 * The 'constructor' for this component
+	 * Gets that canvas object and it's 2D context
 	 * @protected
 	 */
 	initialize: function() {
@@ -1047,7 +1053,7 @@ Roguelike.Systems.Render.prototype = {
 		this.context.save();
 
 		//Loop through all matching entities
-		for(var i = 0; i < entities.length; i++){
+		for(var i = 0; i < entities.length; i++) {
 
 			//Get the components from the current entity and store them temporarily in a variable
 			var renderComponent = entities[i].getComponent("sprite");
@@ -1074,6 +1080,10 @@ Roguelike.Systems.Render.prototype = {
 
 	},
 
+	/**
+	 * Draw the current lightmap onto the canvas
+	 * @protected
+	 */
 	drawLightMap: function() {
 
 		//Save the context to push a copy of our current drawing state onto our drawing state stack
@@ -1120,7 +1130,6 @@ Roguelike.Systems.Render.prototype = {
 	/**
 	 * Function to clear the canvas
 	 * @protected
-	 *
 	 */
 	clear: function() {
 
@@ -1132,11 +1141,6 @@ Roguelike.Systems.Render.prototype = {
 };
 
 Roguelike.Systems.Open = function(game) {
-
-	/**
-	 * @property {string} name - The name of this system. This field is always required!
-	 */
-	this.name = 'open';
 
 	/**
 	 * @property {Roguelike.Game} game - Reference to the current game object
@@ -1157,7 +1161,7 @@ Roguelike.Systems.Open.prototype = {
 		var entities = this.game.map.entities.getEntities("canOpen", "sprite", "position", "collide");
 
 		//Loop through all matching entities
-		for(var i = 0; i < entities.length; i++){
+		for(var i = 0; i < entities.length; i++) {
 
 			//Get the components from the current entity and store them temporarily in a variable
 			var canOpenComponent = entities[i].getComponent("canOpen");
@@ -1166,16 +1170,16 @@ Roguelike.Systems.Open.prototype = {
 			var collideComponent = entities[i].getComponent("collide");
 
 			//Check if any actions need to be performed on this openable entity
-			if(canOpenComponent.actions.length !== 0){
+			if(canOpenComponent.actions.length !== 0) {
 
 				//Loop through the actions
-				for(var a = canOpenComponent.actions.length; a >= 0; a--){
+				for(var a = canOpenComponent.actions.length; a >= 0; a--) {
 
 					//Pop the action from the "stack"
 					var currentAction = canOpenComponent.actions.pop();
 
 					//Action to open the door
-					if(currentAction === "open"){
+					if(currentAction === "open") {
 
 						//Change the door's state to open
 						canOpenComponent.state = "open";
@@ -1202,11 +1206,6 @@ Roguelike.Systems.Open.prototype = {
 };
 
 Roguelike.Systems.LightMap = function(game) {
-
-	/**
-	 * @property {string} name - The name of this system. This field is always required!
-	 */
-	this.name = 'lightMap';
 
 	/**
 	 * @property {Roguelike.Game} game - Reference to the current game object
@@ -1248,6 +1247,10 @@ Roguelike.Systems.LightMap.prototype = {
 		return this.game.map.tiles[y][x].blockLight;
 	},
 
+	/**
+	 * Function to calculate a new octant
+	 * @protected
+	 */
 	calculateOctant: function(position, row, start, end, lightsource, xx, xy, yx, yy, id) {
 		this.tiles.push({
 			x: position.x,
@@ -1338,6 +1341,9 @@ Roguelike.Systems.LightMap.prototype = {
 	/**
 	 * Calculate the new lightning from this lightsource
 	 * @protected
+	 *
+	 * @param {Roguelike.Components.LightSource} lightSource - The lightsource that is being calculated
+	 * @param {Roguelike.Components.Position} position - The position of the lightsource
 	 */
 	calculate: function(lightSource, position) {
 		for(var i = 0; i < 8; i++) {
@@ -1360,13 +1366,13 @@ Roguelike.Systems.LightMap.prototype = {
 	 * Function that gets called when the game continues one tick
 	 * @protected
 	 */
-	update: function(){
+	update: function() {
 
 		//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
 		var entities = this.game.map.entities.getEntities("lightSource", "position");
 
 		//Loop through all matching entities
-		for(var i = 0; i < entities.length; i++){
+		for(var i = 0; i < entities.length; i++) {
 
 			//Get the keyboardControl component
 			var lightSourceComponent = entities[i].getComponent("lightSource");
@@ -1388,11 +1394,6 @@ Roguelike.Systems.LightMap.prototype = {
 };
 
 Roguelike.Systems.Control = function(game) {
-
-	/**
-	 * @property {string} name - The name of this system. This field is always required!
-	 */
-	this.name = 'control';
 
 	/**
 	 * @property {Roguelike.Game} game - Reference to the current game object
@@ -1432,7 +1433,8 @@ Roguelike.Systems.Control = function(game) {
 Roguelike.Systems.Control.prototype = {
 
 	/**
-	 * Initialize the system, create all objects and variables
+	 * The 'constructor' for this component
+	 * Sets up the right keys and sets functions on them
 	 * @protected
 	 */
 	initialize: function() {
@@ -1490,13 +1492,19 @@ Roguelike.Systems.Control.prototype = {
 
 	},
 
-	queueMovement: function(key){
+	/**
+	 * Function to queue movement onto entities that have the keyboard control component
+	 * @protected
+	 *
+	 * @param {int} key - The keycode of the move being queued
+	 */
+	queueMovement: function(key) {
 
 		//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
 		var entities = this.game.map.entities.getEntities("keyboardControl", "position");
 
 		//Loop through all matching entities
-		for(var i = 0; i < entities.length; i++){
+		for(var i = 0; i < entities.length; i++) {
 
 			//Get the keyboardControl component
 			var keyboardControlComponent = entities[i].getComponent("keyboardControl");
@@ -1515,19 +1523,19 @@ Roguelike.Systems.Control.prototype = {
 	 * Function that gets called when the game continues one tick
 	 * @protected
 	 */
-	update: function(){
+	update: function() {
 
 		//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
 		var entities = this.game.map.entities.getEntities("keyboardControl", "position");
 
 		//Loop through all matching entities
-		for(var i = 0; i < entities.length; i++){
+		for(var i = 0; i < entities.length; i++) {
 
 			//Get the keyboardControl component
 			var keyboardControlComponent = entities[i].getComponent("keyboardControl");
 
 			//Loop through the actions
-			for(var a = keyboardControlComponent.actions.length - 1; a >= 0; a--){
+			for(var a = keyboardControlComponent.actions.length - 1; a >= 0; a--) {
 
 				//Pop the action from the "stack"
 				var currentAction = keyboardControlComponent.actions.pop();
@@ -1554,31 +1562,31 @@ Roguelike.Systems.Control.prototype = {
 		var entityPosition = entity.getComponent("position");
 
 		//Check which controls are being pressed and update the player accordingly
-		switch(direction){
+		switch(direction) {
 
 			case (37): //Left
 
 				entityPosition.x -= 1;
 
-			break;
+				break;
 
 			case (38): //Up
 
 				entityPosition.y -= 1;
 
-			break;
+				break;
 
 			case (39): //Right
 
 				entityPosition.x += 1;
 
-			break;
+				break;
 
 			case (40): //Down
 
 				entityPosition.y += 1;
 
-			break;
+				break;
 
 		}
 
@@ -1587,11 +1595,6 @@ Roguelike.Systems.Control.prototype = {
 };
 
 Roguelike.Systems.Collision = function(game) {
-
-	/**
-	 * @property {string} name - The name of this system. This field is always required!
-	 */
-	this.name = 'collision';
 
 	/**
 	 * @property {Roguelike.Game} game - Reference to the current game object
@@ -1606,56 +1609,57 @@ Roguelike.Systems.Collision.prototype = {
 	 * Function that gets called when the game continues one tick
 	 * @protected
 	 */
-	update: function(){
+	update: function() {
 
 		//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
 		var entities = this.game.map.entities.getEntities("keyboardControl", "position");
 
 		//Loop through all matching entities
-		for(var i = 0; i < entities.length; i++){
+		for(var i = 0; i < entities.length; i++) {
 
 			//Get the keyboardControl component
 			var keyboardControlComponent = entities[i].getComponent("keyboardControl");
 			var positionComponent = entities[i].getComponent("position");
 
 			//Loop through the actions
-			for(var a = keyboardControlComponent.actions.length - 1; a >= 0; a--){
+			for(var a = keyboardControlComponent.actions.length - 1; a >= 0; a--) {
 
 				//Pop the action from the "stack"
 				var currentAction = keyboardControlComponent.actions[a];
 
+				//Define the newposition variable
 				var newPosition;
 
-				switch(currentAction){
+				switch(currentAction) {
 
 					case (37): //Left
 
 						newPosition = {x: positionComponent.x - 1, y: positionComponent.y};
 
-					break;
+						break;
 
 					case (39): //Right
 
 						newPosition = {x: positionComponent.x + 1, y: positionComponent.y};
 
-					break;
+						break;
 
 					case (38): //Down
 
 						newPosition = {x: positionComponent.x, y: positionComponent.y - 1};
 
-					break;
+						break;
 
 					case (40): //Up
 
 						newPosition = {x: positionComponent.x, y: positionComponent.y + 1};
 
-					break;
+						break;
 
 				}
 
 				//Check if the new position is correct
-				if(!this.canMove(entities[i], newPosition)){
+				if(!this.canMove(entities[i], newPosition)) {
 
 					//The new position is invalid, remove the action from the queue
 					keyboardControlComponent.actions.splice(a, 1);
@@ -1681,21 +1685,21 @@ Roguelike.Systems.Collision.prototype = {
 		var nextTile = this.game.map.tiles[newPosition.y][newPosition.x];
 
 		//Check for collision on the map, walls etc
-		if(nextTile.type !== 2){
+		if(nextTile.type !== 2) {
 			return false;
 		}
 
 		//Check if there is one or more than one entity at the new location
-		if(nextTile.entities.length !== 0){
+		if(nextTile.entities.length !== 0) {
 
 			//Loop through the entities
-			for(var i = 0; i < nextTile.entities.length; i++){
+			for(var i = 0; i < nextTile.entities.length; i++) {
 
 				//Loop through the components
-				for (var key in nextTile.entities[i].components) {
+				for(var key in nextTile.entities[i].components) {
 
 					//Check if the component has an events parameter
-					if(typeof nextTile.entities[i].components[key].events !== "undefined"){
+					if(typeof nextTile.entities[i].components[key].events !== "undefined") {
 
 						//Trigger the specified event
 						nextTile.entities[i].components[key].events.trigger("bumpInto");
@@ -1705,12 +1709,12 @@ Roguelike.Systems.Collision.prototype = {
 				}
 
 				//Check if the entity has a collide component
-				if(nextTile.entities[i].hasComponent("collide")){
+				if(nextTile.entities[i].hasComponent("collide")) {
 
 
 					//Get the collide component
 					var collideComponent = nextTile.entities[i].getComponent("collide");
-					if(collideComponent.collide === true){
+					if(collideComponent.collide === true) {
 						return false;
 					}
 
@@ -2408,7 +2412,7 @@ Roguelike.MapFactory.prototype = {
 
 		//If the current tile type is a wall, and the tiles above and below here are also walls
 		//this may be a possible door location
-		if(currentTile.type === 1 && aboveTile.type === 1 && belowTile.type === 1){
+		if(currentTile.type === 1 && aboveTile.type === 1 && belowTile.type === 1) {
 
 			//Push the coordinates into the array for later use
 			this.possibleDoorLocations.push({x: x, y: y});
@@ -2456,7 +2460,7 @@ Roguelike.MapFactory.prototype = {
 
 		//If the current tile type is a wall, and the tiles left and right here are also walls
 		//this may be a possible door location
-		if(currentTile.type === 1 && rightTile.type === 1 && leftTile.type === 1){
+		if(currentTile.type === 1 && rightTile.type === 1 && leftTile.type === 1) {
 
 			//Push the coordinates into the array for later use
 			this.possibleDoorLocations.push({x: x, y: y});
@@ -2523,7 +2527,7 @@ Roguelike.MapFactory.prototype = {
 	generateDoors: function() {
 
 		//Loop through all possible door locations
-		for(var i = 0; i < this.possibleDoorLocations.length; i++){
+		for(var i = 0; i < this.possibleDoorLocations.length; i++) {
 
 			//Store the current location in a local variable
 			var doorLocation = this.possibleDoorLocations[i];
@@ -2537,13 +2541,13 @@ Roguelike.MapFactory.prototype = {
 			var randomNumber = Roguelike.Utils.randomNumber(0, 100);
 
 			//If the tiles left and right are walls and the tiles above and below are floors
-			if(tileLeft.type === 1 && tileRight.type === 1 && tileUp.entities.length === 0 && tileDown.entities.length === 0 && tileUp.type === 2 && tileDown.type === 2 && randomNumber > 80){
+			if(tileLeft.type === 1 && tileRight.type === 1 && tileUp.entities.length === 0 && tileDown.entities.length === 0 && tileUp.type === 2 && tileDown.type === 2 && randomNumber > 80) {
 
 				//Place a door at this location
 				this.placeDoor(doorLocation);
 
-			//If the tiles left and right are floors and the tiles above and below are walls
-			}else if(tileLeft.type === 2 && tileRight.type === 2 && tileLeft.entities.length === 0 && tileRight.entities.length === 0 && tileUp.type === 1 && tileDown.type === 1 && randomNumber > 60){
+				//If the tiles left and right are floors and the tiles above and below are walls
+			}else if(tileLeft.type === 2 && tileRight.type === 2 && tileLeft.entities.length === 0 && tileRight.entities.length === 0 && tileUp.type === 1 && tileDown.type === 1 && randomNumber > 60) {
 
 				//Place a door at this location
 				this.placeDoor(doorLocation);
@@ -2558,7 +2562,7 @@ Roguelike.MapFactory.prototype = {
 	 * Place the entrance and exit objects on the map
 	 * @protected
 	 */
-	placeDoor: function(position){
+	placeDoor: function(position) {
 
 		//Get the tile at the door's position
 		var tileAtPosition = this.game.map.tiles[position.y][position.x];
