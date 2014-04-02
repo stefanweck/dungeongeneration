@@ -36,6 +36,7 @@ module.exports = function(grunt) {
 					"lib/gameobjects/systems/lightmap.js",
 					"lib/gameobjects/systems/control.js",
 					"lib/gameobjects/systems/collision.js",
+					"lib/factories/enemyfactory.js",
 					"lib/input/event.js",
 					"lib/input/key.js",
 					"lib/input/keyboard.js",
