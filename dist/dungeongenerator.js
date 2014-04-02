@@ -225,8 +225,8 @@ Roguelike.Utils = {
 
 	/**
 	 * Function to generate a random number between two values
-	 * @param {int} from - The minimum number
-	 * @param {int} to - The maximum number
+	 * @param {number} from - The minimum number
+	 * @param {number} to - The maximum number
 	 */
 	randomNumber: function(from, to) {
 
@@ -289,22 +289,22 @@ Roguelike.Camera = function(game, position) {
 	this.position = position;
 
 	/**
-	 * @property {int} viewportWidth - The width of the game's canvas, in pixels
+	 * @property {number} viewportWidth - The width of the game's canvas, in pixels
 	 */
 	this.viewportWidth = game.settings.canvas.width;
 
 	/**
-	 * @property {int} viewportHeight - The height of the game's canvas, in pixels
+	 * @property {number} viewportHeight - The height of the game's canvas, in pixels
 	 */
 	this.viewportHeight = game.settings.canvas.height;
 
 	/**
-	 * @property {int} minimumDistanceX - The minimal distance from horizontal borders before the camera starts to move, in pixels
+	 * @property {number} minimumDistanceX - The minimal distance from horizontal borders before the camera starts to move, in pixels
 	 */
 	this.minimumDistanceX = 0;
 
 	/**
-	 * @property {int} minimumDistanceY - The minimal distance from vertical borders before the camera starts to move, in pixels
+	 * @property {number} minimumDistanceY - The minimal distance from vertical borders before the camera starts to move, in pixels
 	 */
 	this.minimumDistanceY = 0;
 
@@ -342,8 +342,8 @@ Roguelike.Camera.prototype = {
 	 * @protected
 	 *
 	 * @param {Roguelike.Entity} followEntity - The entity that should be followed by the camera, this entity is required to have the position component
-	 * @param {int} minimumDistanceX - The minimal distance from horizontal borders before the camera starts to move
-	 * @param {int} minimumDistanceY - The minimal distance from vertical borders before the camera starts to move
+	 * @param {number} minimumDistanceX - The minimal distance from horizontal borders before the camera starts to move
+	 * @param {number} minimumDistanceY - The minimal distance from vertical borders before the camera starts to move
 	 */
 	follow: function(followEntity, minimumDistanceX, minimumDistanceY) {
 
@@ -433,12 +433,12 @@ Roguelike.Camera.prototype = {
 Roguelike.Vector2 = function(x, y) {
 
 	/**
-	 * @property {int} x - The x coordinate of this vector2 object
+	 * @property {number} x - The x coordinate of this vector2 object
 	 */
 	this.x = x;
 
 	/**
-	 * @property {int} x - The y coordinate of this vector2 object
+	 * @property {number} x - The y coordinate of this vector2 object
 	 */
 	this.y = y;
 
@@ -513,32 +513,32 @@ Roguelike.Vector2.prototype = {
 Roguelike.Boundary = function(left, top, width, height) {
 
 	/**
-	 * @property {int} left - The left position of this boundary, in pixels
+	 * @property {number} left - The left position of this boundary, in pixels
 	 */
 	this.left = left || 0;
 
 	/**
-	 * @property {int} top - The top position of this boundary, in pixels
+	 * @property {number} top - The top position of this boundary, in pixels
 	 */
 	this.top = top || 0;
 
 	/**
-	 * @property {int} width - The width of this boundary, in pixels
+	 * @property {number} width - The width of this boundary, in pixels
 	 */
 	this.width = width || 0;
 
 	/**
-	 * @property {int} height - The height of this boundary, in pixels
+	 * @property {number} height - The height of this boundary, in pixels
 	 */
 	this.height = height || 0;
 
 	/**
-	 * @property {int} right - The right position of this boundary, in pixels
+	 * @property {number} right - The right position of this boundary, in pixels
 	 */
 	this.right = (this.left + this.width);
 
 	/**
-	 * @property {int} bottom - The bottom position of this boundary, in pixels
+	 * @property {number} bottom - The bottom position of this boundary, in pixels
 	 */
 	this.bottom = (this.top + this.height);
 
@@ -550,10 +550,10 @@ Roguelike.Boundary.prototype = {
 	 * Function that allows the user to set new values for the boundary
 	 * @protected
 	 *
-	 * @param {int} left - The left position of this boundary, in pixels
-	 * @param {int} top - The top position of this boundary, in pixels
-	 * @param {int} width - Optional: The width of this boundary, in pixels
-	 * @param {int} height - Optional: The height of this boundary, in pixels
+	 * @param {number} left - The left position of this boundary, in pixels
+	 * @param {number} top - The top position of this boundary, in pixels
+	 * @param {number} width - Optional: The width of this boundary, in pixels
+	 * @param {number} height - Optional: The height of this boundary, in pixels
 	 */
 	set: function(left, top, width, height) {
 
@@ -802,7 +802,7 @@ Roguelike.Components.Health = function(maxHealth) {
 	this.name = 'health';
 
 	/**
-	 * @property {int} health - The starting, and maximum health of the entity
+	 * @property {number} health - The starting, and maximum health of the entity
 	 */
 	this.health = this.maxHealth = maxHealth;
 
@@ -893,7 +893,7 @@ Roguelike.Components.LightSource = function(gradient, radius) {
 	this.gradient = gradient;
 
 	/**
-	 * @property {int} radius - The radius of the light, how far does it shine it's magical light!
+	 * @property {number} radius - The radius of the light, how far does it shine it's magical light!
 	 */
 	this.radius = radius;
 
@@ -935,12 +935,12 @@ Roguelike.Components.Position = function(x, y) {
 	this.name = 'position';
 
 	/**
-	 * @property {int} x - The horizontal position of the entity
+	 * @property {number} x - The horizontal position of the entity
 	 */
 	this.x = x;
 
 	/**
-	 * @property {int} y - The vertical position of the entity
+	 * @property {number} y - The vertical position of the entity
 	 */
 	this.y = y;
 
@@ -1240,8 +1240,8 @@ Roguelike.Systems.LightMap.prototype = {
 	 * Function that checks if a tile blocks light or not
 	 * @protected
 	 *
-	 * @param {int} x - The X position of the tile
-	 * @param {int} y - The Y position of the tile
+	 * @param {number} x - The X position of the tile
+	 * @param {number} y - The Y position of the tile
 	 */
 	doesTileBlock: function(x, y) {
 		return this.game.map.tiles[y][x].blockLight;
@@ -1496,7 +1496,7 @@ Roguelike.Systems.Control.prototype = {
 	 * Function to queue movement onto entities that have the keyboard control component
 	 * @protected
 	 *
-	 * @param {int} key - The keycode of the move being queued
+	 * @param {number} key - The keycode of the move being queued
 	 */
 	queueMovement: function(key) {
 
@@ -1816,7 +1816,7 @@ Roguelike.Event.prototype = {
 Roguelike.Key = function(keycode) {
 
 	/**
-	 * @property {int} keyCode - The keycode of this specific key
+	 * @property {number} keyCode - The keycode of this specific key
 	 */
 	this.keyCode = keycode;
 
@@ -1831,17 +1831,17 @@ Roguelike.Key = function(keycode) {
 	this.isUp = false;
 
 	/**
-	 * @property {int} lastDown - Timestamp of the last key press
+	 * @property {number} lastDown - Timestamp of the last key press
 	 */
 	this.lastDown = 0;
 
 	/**
-	 * @property {int} lastUp - Timestamp of the last key release
+	 * @property {number} lastUp - Timestamp of the last key release
 	 */
 	this.lastUp = 0;
 
 	/**
-	 * @property {int} delay - Delay between two events on keydown
+	 * @property {number} delay - Delay between two events on keydown
 	 */
 	this.delay = 50;
 
@@ -1957,7 +1957,7 @@ Roguelike.Keyboard.prototype = {
 	 * and add it if it does't exist yet
 	 * @protected
 	 *
-	 * @param {int} keycode - The keycode of the key being added
+	 * @param {number} keycode - The keycode of the key being added
 	 */
 	getKey: function(keycode) {
 
@@ -2018,7 +2018,7 @@ Roguelike.Keyboard.prototype = {
 Roguelike.Tile = function(type, blockLight, room) {
 
 	/**
-	 * @property {int} The kind of tile, wall, floor, void etc
+	 * @property {number} The kind of tile, wall, floor, void etc
 	 */
 	this.type = type;
 
@@ -2038,7 +2038,7 @@ Roguelike.Tile = function(type, blockLight, room) {
 	this.blockLight = blockLight;
 
 	/**
-	 * @property {int} lightLevel - The brightness of the current tile
+	 * @property {number} lightLevel - The brightness of the current tile
 	 */
 	this.lightLevel = 0;
 
@@ -2062,17 +2062,17 @@ Roguelike.Map = function(game) {
 	this.entities = null;
 
 	/**
-	 * @property {int} tilesX - The number of horizontal tiles on this map
+	 * @property {number} tilesX - The number of horizontal tiles on this map
 	 */
 	this.tilesX = game.settings.tilesX;
 
 	/**
-	 * @property {int} tilesY - The number of vertical tiles on this map
+	 * @property {number} tilesY - The number of vertical tiles on this map
 	 */
 	this.tilesY = game.settings.tilesY;
 
 	/**
-	 * @property {int} maxRooms - The maximum number of rooms allowed on this map
+	 * @property {number} maxRooms - The maximum number of rooms allowed on this map
 	 */
 	this.maxRooms = game.settings.maxRooms;
 
@@ -2097,27 +2097,27 @@ Roguelike.Map = function(game) {
 	this.objects = [];
 
 	/**
-	 * @property {int} tileSize - The width and height of a single tile on the map
+	 * @property {number} tileSize - The width and height of a single tile on the map
 	 */
 	this.tileSize = game.settings.tileSize;
 
 	/**
-	 * @property {int} minRoomWidth - The minimum width of a room on this map
+	 * @property {number} minRoomWidth - The minimum width of a room on this map
 	 */
 	this.minRoomWidth = game.settings.minRoomWidth;
 
 	/**
-	 * @property {int} maxRoomWidth - The maximum width of a room on this map
+	 * @property {number} maxRoomWidth - The maximum width of a room on this map
 	 */
 	this.maxRoomWidth = game.settings.maxRoomWidth;
 
 	/**
-	 * @property {int} minRoomHeight - The minimum heigth of a room on this map
+	 * @property {number} minRoomHeight - The minimum heigth of a room on this map
 	 */
 	this.minRoomHeight = game.settings.minRoomHeight;
 
 	/**
-	 * @property {int} maxRoomHeight - The maximum heigth of a room on this map
+	 * @property {number} maxRoomHeight - The maximum heigth of a room on this map
 	 */
 	this.maxRoomHeight = game.settings.maxRoomHeight;
 
@@ -2395,8 +2395,8 @@ Roguelike.MapFactory.prototype = {
 	 * Generate a horizontal corridor tile, and also place doors and walls
 	 * @protected
 	 *
-	 * @param {int} x - The horizontal position of the tile that has to become a corridor
-	 * @param {int} y - The vertical position of the tile that has to become a corridor
+	 * @param {number} x - The horizontal position of the tile that has to become a corridor
+	 * @param {number} y - The vertical position of the tile that has to become a corridor
 	 */
 	generateHorizontalCorridor: function(x, y) {
 
@@ -2443,8 +2443,8 @@ Roguelike.MapFactory.prototype = {
 	 * Generate a vertical corridor tile, and also place walls
 	 * @protected
 	 *
-	 * @param {int} x - The horizontal position of the tile that has to become a corridor
-	 * @param {int} y - The vertical position of the tile that has to become a corridor
+	 * @param {number} x - The horizontal position of the tile that has to become a corridor
+	 * @param {number} y - The vertical position of the tile that has to become a corridor
 	 */
 	generateVerticalCorridor: function(x, y) {
 
@@ -2637,32 +2637,32 @@ Roguelike.MapFactory.prototype = {
 Roguelike.Room = function(x, y, w, h) {
 
 	/**
-	 * @property {int} x1 - The X position of the top left corner of this room
+	 * @property {number} x1 - The X position of the top left corner of this room
 	 */
 	this.x1 = x;
 
 	/**
-	 * @property {int} x2 - The X position of the top right corner of this room
+	 * @property {number} x2 - The X position of the top right corner of this room
 	 */
 	this.x2 = w + x;
 
 	/**
-	 * @property {int} y1 - The Y position of top left corner of this room
+	 * @property {number} y1 - The Y position of top left corner of this room
 	 */
 	this.y1 = y;
 
 	/**
-	 * @property {int} y2 - The Y position of bottom left corner of this room
+	 * @property {number} y2 - The Y position of bottom left corner of this room
 	 */
 	this.y2 = y + h;
 
 	/**
-	 * @property {int} w - The width of this room, defined in tiles
+	 * @property {number} w - The width of this room, defined in tiles
 	 */
 	this.w = w;
 
 	/**
-	 * @property {int} h - The heigth of this room, defined in tiles
+	 * @property {number} h - The heigth of this room, defined in tiles
 	 */
 	this.h = h;
 
