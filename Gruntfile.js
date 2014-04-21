@@ -35,7 +35,7 @@ module.exports = function(grunt) {
 					"lib/gameobjects/systems/open.js",
 					"lib/gameobjects/systems/lightmap.js",
 					"lib/gameobjects/systems/control.js",
-					"lib/gameobjects/systems/collision.js",
+					"lib/gameobjects/systems/movement.js",
 					"lib/factories/playerfactory.js",
 					"lib/factories/enemyfactory.js",
 					"lib/factories/propfactory.js",
