@@ -1,4 +1,4 @@
-/*! Dungeon Generator - v1.8.0 - 2014-04-21
+/*! Dungeon Generator - v1.8.0 - 2014-04-22
 * https://github.com/stefanweck/dungeongeneration
 * Copyright (c) 2014 Stefan Weck */
 /**
@@ -235,8 +235,9 @@ Roguelike.Utils = {
 	 * @public
 	 *
 	 * @param {object} object - The object to search for
-	 * @param {Array} list - The list, aka the array
+	 * @param {array} list - The list, aka the array
 	 */
+	//TODO: This function should always have the same return type
 	contains: function(object, list) {
 
 		//Loop through the list
@@ -772,12 +773,12 @@ Roguelike.Components.Sprite = function(sprite, row, tile) {
 	this.sprite = sprite;
 
 	/**
-	 * @property {number} tile - The tile that the sprite is on, on the tileset
+	 * @property {number} row - The row that the sprite is on, on the tileset
 	 */
 	this.row = row;
 
 	/**
-	 * @property {number} tile - The tile that the sprite is on, on the tileset
+	 * @property {number} tile - The specific tile that the sprite is on, on the tileset
 	 */
 	this.tile = tile;
 
@@ -805,6 +806,7 @@ Roguelike.Components.Health.prototype = {
 	 */
 	isDead: function() {
 
+		//Return true or false based on the entities health
 		return this.health <= 0;
 
 	},
@@ -813,8 +815,9 @@ Roguelike.Components.Health.prototype = {
 	 * Function to take damage
 	 * @protected
 	 */
-	takeDamage: function(damage){
+	takeDamage: function(damage) {
 
+		//Subtract the damage from the health of this entity
 		this.health -= damage;
 
 	}
@@ -871,6 +874,7 @@ Roguelike.Components.CanOpen.prototype = {
 		//If the door is closed, add an open action to the actions stack
 		if(this.state === 'closed') {
 
+			//The Open System will handle opening this door
 			this.actions.push("open");
 
 		}
@@ -906,7 +910,7 @@ Roguelike.Components.Collide = function(collide) {
 	this.name = 'collide';
 
 	/**
-	 * @property {Roguelike.Event} events - Event holder
+	 * @property {bool} collide - True or false depending on if it should collide with other entities
 	 */
 	this.collide = collide;
 
@@ -948,7 +952,7 @@ Roguelike.Components.Weapon = function(damage) {
 	this.name = 'weapon';
 
 	/**
-	 * @property {int} damage - The damage that this weapon does
+	 * @property {number} damage - The damage that this weapon does
 	 */
 	this.damage = damage;
 
@@ -967,7 +971,7 @@ Roguelike.Components.CanFight = function() {
 	this.events = new Roguelike.Event();
 
 	/**
-	 * @property {array} actions - The next actions to perform on this object
+	 * @property {array} actions - A stack with the next actions to perform on this object
 	 */
 	this.actions = [];
 
@@ -996,6 +1000,8 @@ Roguelike.Components.CanFight.prototype = {
 	 */
 	bumpInto: function(entity, collisionEntity) {
 
+		//Push the enemy that is going to get attacked into the actions stack
+		//The combat system will handle the combat!
 		this.actions.push(collisionEntity);
 
 	}
@@ -1010,7 +1016,7 @@ Roguelike.Components.Behaviour = function(behaviour) {
 	this.name = 'behaviour';
 
 	/**
-	 * @property {Roguelike.Event} events - Event holder
+	 * @property {string} behaviour - A string with the behaviour of the entity that holds this component
 	 */
 	this.behaviour = behaviour;
 
@@ -1156,7 +1162,7 @@ Roguelike.Systems.Render.prototype = {
 				this.game.map.tileSize
 			);
 
-			if(entities[i].hasComponent("health")){
+			if(entities[i].hasComponent("health")) {
 
 				var healthComponent = entities[i].getComponent("health");
 
@@ -1632,7 +1638,7 @@ Roguelike.Systems.Control.prototype = {
 	 * The function that gets called when the player moves
 	 * @protected
 	 *
-	 * @param {Number} direction - The direction the entities are being moved
+	 * @param {number} direction - The direction the entities are being moved
 	 * @param {Roguelike.Entity} entity - The entity that is being controlled
 	 */
 	queueMovement: function(direction, entity) {
@@ -1807,7 +1813,7 @@ Roguelike.Systems.Combat = function(game) {
 	this.game = game;
 
 	/**
-	 * @property {Array} toRemove - A stack with all the enemies that are going to be removed at the end of the turn
+	 * @property {array} toRemove - A stack with all the enemies that are going to be removed at the end of the turn
 	 */
 	this.toRemove = [];
 
@@ -1841,7 +1847,7 @@ Roguelike.Systems.Combat.prototype = {
 					var currentEnemy = canFightComponent.actions.pop();
 
 					//Check if the enemy even has a health component before we try to hit it
-					if(currentEnemy.hasComponent("health")){
+					if(currentEnemy.hasComponent("health")) {
 
 						//Get the current entities components
 						var healthComponent = currentEnemy.getComponent("health");
@@ -1850,7 +1856,7 @@ Roguelike.Systems.Combat.prototype = {
 						healthComponent.takeDamage(weaponComponent.damage);
 
 						//If the enemy is dead, we have to remove him from the game
-						if(healthComponent.isDead()){
+						if(healthComponent.isDead()) {
 
 							//Add the current enemy to the remove stack, this way the loop doesn't get interrupted
 							this.toRemove.push(currentEnemy);
@@ -1866,7 +1872,7 @@ Roguelike.Systems.Combat.prototype = {
 		}
 
 		//Loop through the enemies that are dead and need to be removed
-		for (var entity; entity = this.toRemove.pop(); ) {
+		for(var entity; entity = this.toRemove.pop();) {
 
 			//Remove the entity from the map's list
 			this.game.map.entities.removeEntity(entity);
@@ -1878,6 +1884,7 @@ Roguelike.Systems.Combat.prototype = {
 			var currentTile = this.game.map.tiles[positionComponent.position.x][positionComponent.position.y];
 
 			//Remove the entity from the tile it was standing on
+			//TODO: Use Roguelike.Utils function for this
 			var currentEntityPosition = currentTile.entities.indexOf(entity);
 			currentTile.entities.splice(currentEntityPosition, 1);
 
@@ -1944,7 +1951,7 @@ Roguelike.Systems.PathFinding.prototype = {
 			var positionComponent = entities[i].getComponent("position");
 
 			//Check the behaviour of the entity
-			switch (behaviourComponent.behaviour){
+			switch(behaviourComponent.behaviour) {
 
 				case("attack"):
 
@@ -1952,24 +1959,26 @@ Roguelike.Systems.PathFinding.prototype = {
 					var player = this.game.player;
 					var playerPositionComponent = player.getComponent("position");
 
+					//Initialize variables
 					var nextPosition;
 
 					//If the entity is withing 10 tiles of the player, walk to the player
-					if(positionComponent.position.manhattan(playerPositionComponent.position) < 10){
+					if(positionComponent.position.manhattan(playerPositionComponent.position) < 10) {
 
 						//Let EasyStar calculate a path towards the player find a path
-						this.easystar.findPath(positionComponent.position.x, positionComponent.position.y, playerPositionComponent.position.x, playerPositionComponent.position.y, function( path ) {
+						this.easystar.findPath(positionComponent.position.x, positionComponent.position.y, playerPositionComponent.position.x, playerPositionComponent.position.y, function(path) {
 
-							//TODO: FIX IT!
-							if (path === null || path.length === 0) {
+							//TODO: Make sure enemies don't kill eachother, they have to find another route or collaborate
+							if(path === null || path.length === 0) {
 								console.log("no path found");
-							} else {
+							}else{
 								nextPosition = new Roguelike.Vector2(path[1].x, path[1].y);
 								positionComponent.actions.push(nextPosition);
 							}
 
 						});
 
+						//TODO: Find out is this is still needed, i dont think so.
 						this.easystar.calculate();
 
 
@@ -2576,7 +2585,7 @@ Roguelike.Map.prototype = {
 	 * Used for EasyStar Pathfinding
 	 * @protected
 	 */
-	typeList: function(){
+	typeList: function() {
 
 		//Define variables
 		var mapTypeList = [];
@@ -2597,6 +2606,7 @@ Roguelike.Map.prototype = {
 
 		}
 
+		//Return the array with Y X coordinates of every tiletype
 		return mapTypeList;
 
 	},
@@ -2970,7 +2980,7 @@ Roguelike.MapFactory.prototype = {
 				//Place a door at this location
 				this.placeDoor(doorLocation, false);
 
-			//If the tiles left and right are floors and the tiles above and below are walls
+				//If the tiles left and right are floors and the tiles above and below are walls
 			}else if(tileLeft.type === 2 && tileRight.type === 2 && tileLeft.entities.length === 0 && tileRight.entities.length === 0 && tileUp.type === 1 && tileDown.type === 1 && randomNumber > 60) {
 
 				//Place a door at this location
@@ -2994,7 +3004,7 @@ Roguelike.MapFactory.prototype = {
 		//Create the door entity
 		var doorEntity = Roguelike.PropFactory.newDoor(position);
 
-		if(orientation === true){
+		if(orientation === true) {
 			doorEntity.components.sprite.number = 0;
 			doorEntity.components.sprite.row = 2;
 		}
@@ -3083,8 +3093,8 @@ Roguelike.MapFactory.prototype = {
 
 	},
 
-	//TODO: REmove this function here, it's in MapDecorator
-	decorateDungeon: function(){
+	//TODO: Create a MapDecorator that handles all of this
+	decorateDungeon: function() {
 
 		var map = this.game.map;
 
@@ -3094,7 +3104,7 @@ Roguelike.MapFactory.prototype = {
 			//Loop through every vertical row
 			for(var y = 0; y < map.tilesY; y++) {
 
-				if(map.tiles[x][y].type === 1){
+				if(map.tiles[x][y].type === 1) {
 
 					//Get the tile at the location of the possible door location
 					//TODO: Write a function somewhere that returns the surrounding tiles
@@ -3105,45 +3115,45 @@ Roguelike.MapFactory.prototype = {
 
 					//TODO: Maybe use a more elegant autotiling solution for this
 					//Check left type void, right type floor || Check left type void, right type wall, up type void
-					if(tileLeft.type === 0 && tileRight.type === 2 || tileLeft.type === 0 && tileRight.type === 1 && tileUp.type === 0){
+					if(tileLeft.type === 0 && tileRight.type === 2 || tileLeft.type === 0 && tileRight.type === 1 && tileUp.type === 0) {
 
 						map.tiles[x][y].tileNumber = 3;
 
-					//Check right type void, left type floor || Check right type void, left type wall, up type void
-					}else if(tileRight.type === 0 && tileLeft.type === 2 || tileRight.type === 0 && tileLeft.type === 1 && tileUp.type === 0){
+						//Check right type void, left type floor || Check right type void, left type wall, up type void
+					}else if(tileRight.type === 0 && tileLeft.type === 2 || tileRight.type === 0 && tileLeft.type === 1 && tileUp.type === 0) {
 
 						map.tiles[x][y].tileNumber = 4;
 
-					//Check above for a wall, left for a wall and right for void
-					}else if(tileUp.type === 1 && tileLeft.type === 1 && tileRight.type === 0){
+						//Check above for a wall, left for a wall and right for void
+					}else if(tileUp.type === 1 && tileLeft.type === 1 && tileRight.type === 0) {
 
 						map.tiles[x][y].tileNumber = 6;
 
-					//Check above for a wall, right for a wall and left for void
-					}else if(tileUp.type === 1 && tileRight.type === 1 && tileLeft.type === 0){
+						//Check above for a wall, right for a wall and left for void
+					}else if(tileUp.type === 1 && tileRight.type === 1 && tileLeft.type === 0) {
 
 						map.tiles[x][y].tileNumber = 5;
 
-					//Check up for floor, down for wall, left for floor, right for wall
-					}else if(tileUp.type === 2 && tileDown.type === 1 && tileLeft.type === 2 && tileRight.type === 1){
+						//Check up for floor, down for wall, left for floor, right for wall
+					}else if(tileUp.type === 2 && tileDown.type === 1 && tileLeft.type === 2 && tileRight.type === 1) {
 
 						map.tiles[x][y].tileRow = 1;
 						map.tiles[x][y].tileNumber = 3;
 
-					//Check up for floor, down for wall, left for wall, right for floor
-					}else if(tileUp.type === 2 && tileDown.type === 1 && tileLeft.type === 1 && tileRight.type === 2){
+						//Check up for floor, down for wall, left for wall, right for floor
+					}else if(tileUp.type === 2 && tileDown.type === 1 && tileLeft.type === 1 && tileRight.type === 2) {
 
 						map.tiles[x][y].tileRow = 1;
 						map.tiles[x][y].tileNumber = 2;
 
-					//Check if above is floor, right and left are floor and beneath is a wall
-					}else if(tileUp.type === 2 && tileDown.type === 1 && tileLeft.type === 2 && tileRight.type === 2){
+						//Check if above is floor, right and left are floor and beneath is a wall
+					}else if(tileUp.type === 2 && tileDown.type === 1 && tileLeft.type === 2 && tileRight.type === 2) {
 
 						map.tiles[x][y].tileRow = 1;
 						map.tiles[x][y].tileNumber = 5;
 
-					//Check if the tiles left and right are floors, and up and down are walls
-					}else if(tileUp.type === 1 && tileDown.type === 1 && tileLeft.type === 2 && tileRight.type === 2 || tileUp.type === 1 && tileDown.type === 1 && tileLeft.type === 2 && tileRight.type === 1){
+						//Check if the tiles left and right are floors, and up and down are walls
+					}else if(tileUp.type === 1 && tileDown.type === 1 && tileLeft.type === 2 && tileRight.type === 2 || tileUp.type === 1 && tileDown.type === 1 && tileLeft.type === 2 && tileRight.type === 1) {
 
 						map.tiles[x][y].tileRow = 1;
 						map.tiles[x][y].tileNumber = 4;
@@ -3152,15 +3162,18 @@ Roguelike.MapFactory.prototype = {
 
 				}
 
-				if(map.tiles[x][y].type === 2){
+				//If the current tile is a floor tile
+				if(map.tiles[x][y].type === 2) {
 
 					//Have a random chance to spawn grass on this tile
-					if(Roguelike.Utils.randomNumber(0, 100) >= 80){
+					if(Roguelike.Utils.randomNumber(0, 100) >= 80) {
 
+						//Create a new grass entity
 						grassEntity = new Roguelike.DecorationFactory.newGrass(
 							new Roguelike.Vector2(x, y)
 						);
 
+						//Add the entity to the tile on the map
 						map.tiles[x][y].entities.push(grassEntity);
 
 						//Add the entity to the map
@@ -3169,13 +3182,14 @@ Roguelike.MapFactory.prototype = {
 					}
 
 					//Have a random chance to spawn an enemy on this tile
-					if(Roguelike.Utils.randomNumber(0, 100) >= 100){
+					if(Roguelike.Utils.randomNumber(0, 100) >= 100) {
 
-						//grassEntity = new Roguelike.DecorationFactory.newGrass({x: x, y: y});
+						//Create a new skeleton
 						enemyEntity = new Roguelike.EnemyFactory.newSkeleton(
 							new Roguelike.Vector2(x, y)
 						);
 
+						//Add the entity to the tile on the map
 						map.tiles[x][y].entities.push(enemyEntity);
 
 						//Add the entity to the map
