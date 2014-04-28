@@ -1,4 +1,4 @@
-/*! Dungeon Generator - v1.8.0 - 2014-04-22
+/*! Dungeon Generator - v1.8.0 - 2014-04-29
 * https://github.com/stefanweck/dungeongeneration
 * Copyright (c) 2014 Stefan Weck */
 /**
@@ -63,9 +63,29 @@ Roguelike.Game = function(userSettings) {
 	this.map = null;
 
 	/**
-	 * @property {Roguelike.Systems} systems - An array with all the current systems
+	 * @property {Roguelike.Keyboard} keyboard - Reference to the keyboard object
 	 */
-	this.systems = [];
+	this.keyboard = null;
+
+	/**
+	 * @property {Roguelike.Scheduler} scheduler - Reference to the scheduler object
+	 */
+	this.scheduler = null;
+
+	/**
+	 * @property {Roguelike.Systems.Movement} movementSystem - Reference to the movement system
+	 */
+	this.movementSystem = null;
+
+	/**
+	 * @property {Roguelike.Systems.PathFinding} pathfindingSystem - Reference to the pathfinding system
+	 */
+	this.pathfindingSystem = null;
+
+	/**
+	 * @property {Roguelike.Systems} dynamicSystems - An array with all the current systems that need to be looped
+	 */
+	this.dynamicSystems = [];
 
 	/**
 	 * @property {Roguelike.Camera} camera - Reference to the camera
@@ -114,15 +134,22 @@ Roguelike.Game.prototype = {
 			return;
 		}
 
+		//Create a new keyboard
+		this.keyboard = new Roguelike.Keyboard();
+
 		//Initialize the map
 		this.map = new Roguelike.Map(this);
-		this.map.initialize();
 
 		//Add a new entity group to the map
 		this.map.entities = new Roguelike.Group(this);
 
+		//Create a new scheduler
+		this.scheduler = new Roguelike.Scheduler();
+
 		//Generate rooms for this map
 		this.map.mapFactory.generateRooms();
+
+		//Add the just generated rooms to the map
 		this.map.addRooms();
 
 		//Generate the corridors on this map
@@ -140,31 +167,49 @@ Roguelike.Game.prototype = {
 		//Create the camera object
 		this.camera = new Roguelike.Camera(this, {x: 0, y: 0});
 
-		//Create the player entity
+		//Get the start position of the player
 		var playerPosition = new Roguelike.Vector2(this.map.entrance.x, this.map.entrance.y);
-		this.player = Roguelike.PlayerFactory.newPlayerWarrior(playerPosition);
+
+		//Associative array with every control that this entity uses
+		var playerControls = {};
+		playerControls["left"] = 37;
+		playerControls["right"] = 39;
+		playerControls["up"] = 38;
+		playerControls["down"] = 40;
+
+		//Create the player entity
+		this.player = Roguelike.PlayerFactory.newPlayerWarrior(this, playerPosition, playerControls);
 
 		//Add the player to the entities list of the current map
 		this.map.entities.addEntity(this.player);
 
+		//Get the tile that the player is going to spawn on
+		var startingTile = this.map.tiles[playerPosition.x][playerPosition.y];
+
+		//Add the player to the tile it spawns on
+		startingTile.addEntity(this.player);
+
+		//Add the player to the scheduler
+		this.scheduler.add(this.player, true);
+
 		//Let the camera follow the player entity
 		this.camera.follow(this.player, this.settings.canvas.width / 2, this.settings.canvas.height / 2);
 
-		//Add all systems to the game
-		//First we add the systems that can queue movement on entities
-		this.systems.push(new Roguelike.Systems.PathFinding(this));
-		this.systems.push(new Roguelike.Systems.Control(this));
+		//Initialize the movement system
+		this.movementSystem = new Roguelike.Systems.Movement(this);
 
-		//Movement system checks the queued movement for collision and moves accordingly
-		this.systems.push(new Roguelike.Systems.Movement(this));
+		//Initialize the movement system
+		this.pathfindingSystem = new Roguelike.Systems.PathFinding(this);
+
+		//Add all systems to the game that need to be looped
 
 		//Next up are the systems that handle specific queues like open or combat
-		this.systems.push(new Roguelike.Systems.Open(this));
-		this.systems.push(new Roguelike.Systems.Combat(this));
+		this.dynamicSystems.push(new Roguelike.Systems.Open(this));
+		this.dynamicSystems.push(new Roguelike.Systems.Combat(this));
 
 		//Last thing on the list are visual systems, these should always be updated last
-		this.systems.push(new Roguelike.Systems.LightMap(this));
-		this.systems.push(new Roguelike.Systems.Render(this));
+		this.dynamicSystems.push(new Roguelike.Systems.LightMap(this));
+		this.dynamicSystems.push(new Roguelike.Systems.Render(this));
 
 		//Update the game for the first time
 		this.update();
@@ -181,13 +226,25 @@ Roguelike.Game.prototype = {
 	 */
 	update: function() {
 
-		//Loop through each system
-		for(var s = 0; s < this.systems.length; s++) {
+		var _this = this;
+		requestAnimationFrame(function(){ _this.update()});
 
-			//Update the current system
-			this.systems[s].update();
+		//While the scheduler is locked, continue ticking
+		while(!this.scheduler.lockCount){
+
+			//Let the scheduler handle the next entity
+			this.scheduler.tick();
 
 		}
+
+		//Loop through each dynamic system
+		for(var s = 0; s < this.dynamicSystems.length; s++) {
+
+			//Update the current system
+			this.dynamicSystems[s].update();
+
+		}
+
 
 	}
 
@@ -201,6 +258,8 @@ Roguelike.Utils = {
 	 *
 	 * @param {Number} from - The minimum number
 	 * @param {Number} to - The maximum number
+	 *
+	 * @return {Number} A random number between the two supplied values
 	 */
 	randomNumber: function(from, to) {
 
@@ -215,6 +274,8 @@ Roguelike.Utils = {
 	 *
 	 * @param {Object} a - The original object to extend
 	 * @param {Object} b - The new settings that override the original object
+	 *
+	 * @return {Object} The extended object
 	 */
 	extend: function(a, b) {
 
@@ -236,8 +297,9 @@ Roguelike.Utils = {
 	 *
 	 * @param {Object} object - The object to search for
 	 * @param {Array} list - The list, aka the array
+	 *
+	 * @return {Number} Position on success, minus one on failure
 	 */
-	//TODO: This function should always have the same return type
 	contains: function(object, list) {
 
 		//Loop through the list
@@ -250,7 +312,7 @@ Roguelike.Utils = {
 		}
 
 		//No results found, the list doesn't contain the object
-		return false;
+		return -1;
 
 	}
 
@@ -427,25 +489,44 @@ Roguelike.Vector2 = function(x, y) {
 Roguelike.Vector2.prototype = {
 
 	/**
-	 * Add another vector2 object
+	 * Add another Vector2 object to this Vector2 object
 	 * @protected
 	 *
-	 * @param {Roguelike.Vector2} other - The y other vector2 object
+	 * @param {Roguelike.Vector2} other - The other Vector2 object
+	 *
+	 * @return {Roguelike.Vector2} The combined Vector2 object
+	 */
+	combine: function(other){
+
+		//Return the Vector2 object
+		return new Roguelike.Vector2(this.x + other.x, this.y + other.y);
+
+	},
+
+	/**
+	 * Add another Vector2 object
+	 * @protected
+	 *
+	 * @param {Roguelike.Vector2} other - The other Vector2 object
+	 *
+	 * @return {Number} The value of both added Vector2 objects
 	 */
 	add: function(other) {
 
-		var dx = pos.x - this.x;
-		var dy = pos.y - this.y;
+		var dx = other.x - this.x;
+		var dy = other.y - this.y;
 
 		return Math.abs(Math.sqrt((dx * dx) + (dy * dy)));
 
 	},
 
 	/**
-	 * Distance to another Vector2 Object
+	 * Distance to another Vector2 object
 	 * @protected
 	 *
-	 * @param {Object} pos - The position of the other object
+	 * @param {Object} pos - The position of the other Vector2 object
+	 *
+	 * @return {Number} The distance to the other Vector2 object
 	 */
 	distance: function(pos) {
 
@@ -460,7 +541,9 @@ Roguelike.Vector2.prototype = {
 	 * Manhattan distance to another object
 	 * @protected
 	 *
-	 * @param {Object} pos - The position of the other object
+	 * @param {Object} pos - The position of the other Vector2 object
+	 *
+	 * @return {Number} The manhattan distance to the other Vector2 object
 	 */
 	manhattan: function(pos) {
 
@@ -469,18 +552,22 @@ Roguelike.Vector2.prototype = {
 	},
 
 	/**
-	 * Clone the current Vector2 Object
+	 * Clone the current Vector2 object
 	 * @protected
+	 *
+	 * @return {Roguelike.Vector2} The cloned Vector2 object
 	 */
 	clone: function() {
 
-		return(new Vector2(this.x, this.y));
+		return(new Roguelike.Vector2(this.x, this.y));
 
 	},
 
 	/**
-	 * Create a string from this Vector2 Object
+	 * Create a string from this Vector2 object
 	 * @protected
+	 *
+	 * @return {String} The Vector2 object as a string
 	 */
 	toString: function() {
 
@@ -551,6 +638,8 @@ Roguelike.Boundary.prototype = {
 	 * @protected
 	 *
 	 * @param {Roguelike.Boundary} boundary - The boundary to check against
+	 *
+	 * @return {Boolean} Returns true if the boundary is within this boundary, returns false if it isn't
 	 */
 	isWithin: function(boundary) {
 
@@ -568,6 +657,8 @@ Roguelike.Boundary.prototype = {
 	 * @protected
 	 *
 	 * @param {Roguelike.Boundary} boundary - The boundary to check against
+	 *
+	 * @return {Number} Returns true if the boundary is overlapping this boundary, returns false if it isn't
 	 */
 	isOverlapping: function(boundary) {
 
@@ -582,7 +673,17 @@ Roguelike.Boundary.prototype = {
 
 };
 
-Roguelike.Entity = function() {
+Roguelike.Entity = function(game, speed) {
+
+	/**
+	 * @property {Roguelike.Game} game - Reference to the current game object
+	 */
+	this.game = game;
+
+	/**
+	 * @property {Number} speed - The speed of this entity
+	 */
+	this.speed = speed || 1000;
 
 	/**
 	 * @property {Object} components - An object filled with all the components this entity has
@@ -604,10 +705,48 @@ Roguelike.Entity = function() {
 Roguelike.Entity.prototype = {
 
 	/**
+	 * Function that gets called when this entity is in a scheduler and it
+	 * is his turn
+	 * @protected
+	 */
+	act: function(){
+
+		//If this is a player, lock the scheduler
+		if(this.hasComponent("keyboardControl")){
+
+			this.game.scheduler.lock();
+
+		}else{
+
+			//Get the components
+			var movementComponent = this.getComponent("movement");
+
+			//Execute movement component behaviour
+			movementComponent.execute();
+
+		}
+
+	},
+
+	/**
+	 * A function that returns the speed of this entity
+	 * @protected
+	 *
+	 * @return {Number} The speed of this entity
+	 */
+	getSpeed: function(){
+
+		return this.speed;
+
+	},
+
+	/**
 	 * Check whether this entity has a certain component
 	 * @protected
 	 *
 	 * @param {string} name - The name of the component
+	 *
+	 * @return {Boolean} True when the entity has the component, false when it doesn't have the component
 	 */
 	hasComponent: function(name) {
 
@@ -620,6 +759,8 @@ Roguelike.Entity.prototype = {
 	 * @protected
 	 *
 	 * @param {string} name - The name of the component
+	 *
+	 * @return {Roguelike.Components} The component that this entity has
 	 */
 	getComponent: function(name) {
 
@@ -687,7 +828,9 @@ Roguelike.Group.prototype = {
 
 		//Check if the entity is the correct object
 		if(!entity instanceof Roguelike.Entity) {
+
 			return;
+
 		}
 
 		//Add the current entity to the list
@@ -707,8 +850,10 @@ Roguelike.Group.prototype = {
 		var position = Roguelike.Utils.contains(entity, this.entities);
 
 		//The element doesn't exist in the list
-		if(position === false) {
+		if(position === -1) {
+
 			return;
+
 		}
 
 		//Remove the current entity from the group
@@ -719,6 +864,8 @@ Roguelike.Group.prototype = {
 	/**
 	 * Function to return all entities with certain components
 	 * @protected
+	 *
+	 * @return {Array} The array with all matching entities
 	 */
 	getEntities: function() {
 
@@ -737,7 +884,9 @@ Roguelike.Group.prototype = {
 				//If the current entity has the specified component. Push a random
 				//value into the isThere array for later checks
 				if(this.entities[i].components[arguments[a]]) {
+
 					isThere.push(1);
+
 				}
 
 			}
@@ -803,6 +952,8 @@ Roguelike.Components.Health.prototype = {
 	/**
 	 * Check whether the entity is dead
 	 * @protected
+	 *
+	 * @return {Boolean} True when dead, false when alive
 	 */
 	isDead: function() {
 
@@ -916,12 +1067,179 @@ Roguelike.Components.Collide = function(collide) {
 
 };
 
-Roguelike.Components.KeyboardControl = function() {
+Roguelike.Components.KeyboardControl = function(entity, game, controls) {
 
 	/**
 	 * @property {string} name - The name of this system. This field is always required!
 	 */
 	this.name = 'keyboardControl';
+
+	/**
+	 * @property {Roguelike.Entity} entity - Reference to the entity that has this component
+	 */
+	this.entity = entity;
+
+	/**
+	 * @property {Roguelike.Game} game - Reference to the current game object
+	 */
+	this.game = game;
+
+	/**
+	 * @property {Array} controls - Associative array with every control that this entity uses
+	 */
+	this.controls = controls;
+
+	/**
+	 * @property {Roguelike.Keyboard} keyboard - Reference to the keyboard object
+	 */
+	this.keyboard = game.keyboard;
+
+	/**
+	 * @property {Roguelike.Scheduler} scheduler - Reference to the scheduler object
+	 */
+	this.scheduler = game.scheduler;
+
+	//Initialize the component
+	this.initialize();
+
+};
+
+Roguelike.Components.KeyboardControl.prototype = {
+
+	/**
+	 * The 'constructor' for this component
+	 * Adds the event listener for keyboards events on this entity
+	 * @protected
+	 */
+	initialize: function() {
+
+		//Make sure the function inside the event listener can reach the scheduler
+		var _this = this;
+
+		//Loop through each control keycode of this entity
+		for(var key in _this.controls){
+
+			switch(key){
+
+				case("left"):
+
+					//Add up key and tell it to move the entities up when it hits
+					var leftKey = this.keyboard.getKey(_this.controls[key]);
+
+					//Function to perform
+					var moveLeft = function() {
+						_this.newPosition("left");
+					};
+
+					//Attach the function to the keydown event
+					leftKey.onDown.on(_this.controls[key], moveLeft, _this);
+
+					break;
+
+				case("right"):
+
+					//Add up key and tell it to move the entities up when it hits
+					var rightKey = this.keyboard.getKey(_this.controls[key]);
+
+					//Function to perform
+					var moveRight = function() {
+						_this.newPosition("right");
+					};
+
+					//Attach the function to the keydown event
+					rightKey.onDown.on(_this.controls[key], moveRight, _this);
+
+					break;
+
+				case("up"):
+
+					//Add up key and tell it to move the entities up when it hits
+					var upKey = this.keyboard.getKey(_this.controls[key]);
+
+					//Function to perform
+					var moveUp = function() {
+						_this.newPosition("up");
+					};
+
+					//Attach the function to the keydown event
+					upKey.onDown.on(_this.controls[key], moveUp, _this);
+
+					break;
+
+				case("down"):
+
+					//Add up key and tell it to move the entities up when it hits
+					var downKey = this.keyboard.getKey(_this.controls[key]);
+
+					//Function to perform
+					var moveDown = function() {
+						_this.newPosition("down");
+					};
+
+					//Attach the function to the keydown event
+					downKey.onDown.on(_this.controls[key], moveDown, _this);
+
+					break;
+
+			}
+
+		}
+
+	},
+
+	/**
+	 * The function that gets called when a player moves
+	 * @protected
+	 *
+	 * @param {string} direction - The direction the entities are being moved
+	 */
+	newPosition: function(direction) {
+
+		//Define variables
+		var movement;
+
+		//Check which controls are being pressed and update the player accordingly
+		switch(direction) {
+
+			case ("left"):
+
+				movement = new Roguelike.Vector2(-1, 0);
+
+				break;
+
+			case ("up"):
+
+				movement = new Roguelike.Vector2(0, -1);
+
+				break;
+
+			case ("right"):
+
+				movement = new Roguelike.Vector2(1, 0);
+
+				break;
+
+			case ("down"):
+
+				movement = new Roguelike.Vector2(0, 1);
+
+				break;
+
+		}
+
+		//Get the components
+		var positionComponent = this.entity.getComponent("position");
+
+		//Calculate the new position
+		var newPosition = positionComponent.position.combine(movement);
+
+		//Tell the movement system that you want to move to the new position
+		this.game.movementSystem.handleSingleEntity(this.entity, newPosition);
+
+		//Unlock the scheduler because the player has moved
+		this.scheduler.unlock();
+
+	}
 
 };
 
@@ -936,11 +1254,6 @@ Roguelike.Components.Position = function(position) {
 	 * @property {Roguelike.Vector2} position - The position object of this entity
 	 */
 	this.position = position;
-
-	/**
-	 * @property {Array} actions - The next actions to perform on this object
-	 */
-	this.actions = [];
 
 };
 
@@ -1008,17 +1321,42 @@ Roguelike.Components.CanFight.prototype = {
 
 };
 
-Roguelike.Components.Behaviour = function(behaviour) {
+Roguelike.Components.Movement = function(game, entity, func) {
 
 	/**
 	 * @property {string} name - The name of this system. This field is always required!
 	 */
-	this.name = 'behaviour';
+	this.name = 'movement';
 
 	/**
-	 * @property {string} behaviour - A string with the behaviour of the entity that holds this component
+	 * @property {Roguelike.Game} game - Reference to the current game object
 	 */
-	this.behaviour = behaviour;
+	this.game = game;
+
+	/**
+	 * @property {Roguelike.Entity} entity - Reference to the entity that has this component
+	 */
+	this.entity = entity;
+
+	/**
+	 * @property {Function} func - The move functionality that is defined in moveBehaviours.js
+	 */
+	this.move = func;
+
+};
+
+Roguelike.Components.Movement.prototype = {
+
+	/**
+	 * Initialize the game, create all objects
+	 * @protected
+	 */
+	execute: function() {
+
+		//Execute the move behaviour applied to this component
+		this.move(this.game, this.entity);
+
+	}
 
 };
 
@@ -1074,6 +1412,89 @@ Roguelike.Systems.Render.prototype = {
 	},
 
 	/**
+	 * Function that gets called when the game continues one tick
+	 * @protected
+	 */
+	update: function() {
+
+		//Update the camera
+		//TODO: Move this outta here!
+		this.game.camera.update();
+
+		//Clear the canvas and draw the map
+		this.clear();
+		this.drawMap();
+
+		//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
+		var entities = this.game.map.entities.getEntities("position", "sprite");
+
+		//Save the context to push a copy of our current drawing state onto our drawing state stack
+		this.context.save();
+
+		//Loop through all matching entities
+		for(var i = 0; i < entities.length; i++) {
+
+			//Perform the needed operations for this specific system on one entity
+			this.handleSingleEntity(entities[i]);
+
+		}
+
+		//Pop the last saved drawing state off of the drawing state stack
+		this.context.restore();
+
+		//Draw the lightmap
+		this.drawLightMap();
+
+	},
+
+	/**
+	 * Performs the needed operations for this specific system on one entity
+	 * @protected
+	 *
+	 * @param {Roguelike.Entity} entity - The entity that is being processed by this system
+	 */
+	handleSingleEntity : function(entity){
+
+		//Get the components from the current entity and store them temporarily in a variable
+		var renderComponent = entity.getComponent("sprite");
+		var positionComponent = entity.getComponent("position");
+
+		//TODO: Use a preloader and only get the file once, not every frame T__T
+		var img = document.getElementById(renderComponent.sprite);
+
+		//Draw the sprite of this entity on the canvas
+		this.context.drawImage(
+			img,
+			renderComponent.tile * 16,
+			renderComponent.row * 16,
+			16,
+			16,
+			(positionComponent.position.x * this.game.map.tileSize) - this.game.camera.position.x,
+			(positionComponent.position.y * this.game.map.tileSize) - this.game.camera.position.y,
+			this.game.map.tileSize,
+			this.game.map.tileSize
+		);
+
+		//If the entity has health, draw a healthbar
+		if(entity.hasComponent("health")) {
+
+			//Get the components
+			var healthComponent = entity.getComponent("health");
+
+			//Draw the health text
+			this.context.font = 'bold 12pt arial';
+			this.context.fillStyle = 'white';
+			this.context.fillText(
+				healthComponent.health,
+				(positionComponent.position.x * this.game.map.tileSize) - this.game.camera.position.x,
+				(positionComponent.position.y * this.game.map.tileSize) - this.game.camera.position.y
+			);
+
+		}
+
+	},
+
+	/**
 	 * Draw the current map onto the canvas
 	 * @protected
 	 */
@@ -1117,72 +1538,6 @@ Roguelike.Systems.Render.prototype = {
 
 		//Pop the last saved drawing state off of the drawing state stack
 		this.context.restore();
-
-	},
-
-	/**
-	 * Function that gets called when the game continues one tick
-	 * @protected
-	 */
-	update: function() {
-
-		//Update the camera
-		//TODO: Move this outta here!
-		this.game.camera.update();
-
-		//Clear the canvas and draw the map
-		this.clear();
-		this.drawMap();
-
-		//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
-		var entities = this.game.map.entities.getEntities("position", "sprite");
-
-		//Save the context to push a copy of our current drawing state onto our drawing state stack
-		this.context.save();
-
-		//Loop through all matching entities
-		for(var i = 0; i < entities.length; i++) {
-
-			//Get the components from the current entity and store them temporarily in a variable
-			var renderComponent = entities[i].getComponent("sprite");
-			var positionComponent = entities[i].getComponent("position");
-
-			//TODO: Use a preloader and only get the file once, not every frame T__T
-			var img = document.getElementById(renderComponent.sprite);
-
-			this.context.drawImage(
-				img,
-				renderComponent.tile * 16,
-				renderComponent.row * 16,
-				16,
-				16,
-				(positionComponent.position.x * this.game.map.tileSize) - this.game.camera.position.x,
-				(positionComponent.position.y * this.game.map.tileSize) - this.game.camera.position.y,
-				this.game.map.tileSize,
-				this.game.map.tileSize
-			);
-
-			if(entities[i].hasComponent("health")) {
-
-				var healthComponent = entities[i].getComponent("health");
-
-				this.context.font = 'bold 12pt arial';
-				this.context.fillStyle = 'white';
-				this.context.fillText(
-					healthComponent.health,
-					(positionComponent.position.x * this.game.map.tileSize) - this.game.camera.position.x,
-					(positionComponent.position.y * this.game.map.tileSize) - this.game.camera.position.y
-				);
-
-			}
-
-		}
-
-		//Pop the last saved drawing state off of the drawing state stack
-		this.context.restore();
-
-		//Draw the lightmap
-		this.drawLightMap();
 
 	},
 
@@ -1270,37 +1625,50 @@ Roguelike.Systems.Open.prototype = {
 		//Loop through all matching entities
 		for(var i = 0; i < entities.length; i++) {
 
-			//Get the components from the current entity and store them temporarily in a variable
-			var canOpenComponent = entities[i].getComponent("canOpen");
-			var spriteComponent = entities[i].getComponent("sprite");
-			var positionComponent = entities[i].getComponent("position");
-			var collideComponent = entities[i].getComponent("collide");
+			//Perform the needed operations for this specific system on one entity
+			this.handleSingleEntity(entities[i]);
 
-			//Check if any actions need to be performed on this openable entity
-			if(canOpenComponent.actions.length !== 0) {
+		}
 
-				//Loop through the actions
-				for(var a = canOpenComponent.actions.length; a > 0; a--) {
+	},
 
-					//Pop the action from the "stack"
-					var currentAction = canOpenComponent.actions.pop();
+	/**
+	 * Performs the needed operations for this specific system on one entity
+	 * @protected
+	 *
+	 * @param {Roguelike.Entity} entity - The entity that is being processed by this system
+	 */
+	handleSingleEntity : function(entity){
 
-					//Action to open the door
-					if(currentAction === "open") {
+		//Get the components from the current entity and store them temporarily in a variable
+		var canOpenComponent = entity.getComponent("canOpen");
+		var spriteComponent = entity.getComponent("sprite");
+		var positionComponent = entity.getComponent("position");
+		var collideComponent = entity.getComponent("collide");
 
-						//Change the door's state to open
-						canOpenComponent.state = "open";
+		//Check if any actions need to be performed on this openable entity
+		if(canOpenComponent.actions.length !== 0) {
 
-						//Change the sprite to open
-						spriteComponent.tile += 1;
+			//Loop through the actions
+			for(var a = canOpenComponent.actions.length; a > 0; a--) {
 
-						//Make sure the collide component doesn't say it collides anymore
-						collideComponent.collide = false;
+				//Pop the action from the "stack"
+				var currentAction = canOpenComponent.actions.pop();
 
-						//Make sure the tile that this openable entity is on doesn't block light anymore
-						this.game.map.tiles[positionComponent.position.x][positionComponent.position.y].blockLight = false;
+				//Action to open the door
+				if(currentAction === "open") {
 
-					}
+					//Change the door's state to open
+					canOpenComponent.state = "open";
+
+					//Change the sprite to open
+					spriteComponent.tile += 1;
+
+					//Make sure the collide component doesn't say it collides anymore
+					collideComponent.collide = false;
+
+					//Make sure the tile that this openable entity is on doesn't block light anymore
+					this.game.map.tiles[positionComponent.position.x][positionComponent.position.y].blockLight = false;
 
 				}
 
@@ -1344,14 +1712,62 @@ Roguelike.Systems.LightMap = function(game) {
 Roguelike.Systems.LightMap.prototype = {
 
 	/**
+	 * Function that gets called when the game continues one tick
+	 * @protected
+	 */
+	update: function() {
+
+		//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
+		var entities = this.game.map.entities.getEntities("lightSource", "position");
+
+		//Loop through all matching entities
+		for(var i = 0; i < entities.length; i++) {
+
+			//Perform the needed operations for this specific system on one entity
+			this.handleSingleEntity(entities[i]);
+
+		}
+
+	},
+
+	/**
+	 * Performs the needed operations for this specific system on one entity
+	 * @protected
+	 *
+	 * @param {Roguelike.Entity} entity - The entity that is being processed by this system
+	 */
+	handleSingleEntity : function(entity){
+
+		//Get the keyboardControl component
+		var lightSourceComponent = entity.getComponent("lightSource");
+		var positionComponent = entity.getComponent("position");
+
+		//Update the lightsource
+		var newLight = this.clear().concat(this.calculate(lightSourceComponent, positionComponent.position));
+
+		//Update the tiles on the map with the new light levels
+		for(var l = 0; l < newLight.length; l++) {
+
+			this.game.map.tiles[newLight[l].x][newLight[l].y].lightLevel = newLight[l].lightLevel;
+			this.game.map.tiles[newLight[l].x][newLight[l].y].explored = true;
+
+		}
+
+	},
+
+	/**
 	 * Function that checks if a tile blocks light or not
 	 * @protected
 	 *
 	 * @param {Number} x - The X position of the tile
 	 * @param {Number} y - The Y position of the tile
+	 *
+	 * @return {Boolean} True when the tile does block light, false when the tile doesn't block light
 	 */
 	doesTileBlock: function(x, y) {
+
 		return this.game.map.tiles[x][y].blockLight;
+
 	},
 
 	/**
@@ -1359,6 +1775,7 @@ Roguelike.Systems.LightMap.prototype = {
 	 * @protected
 	 */
 	calculateOctant: function(position, row, start, end, lightsource, xx, xy, yx, yy, id) {
+
 		this.tiles.push({
 			x: position.x,
 			y: position.y,
@@ -1428,13 +1845,17 @@ Roguelike.Systems.LightMap.prototype = {
 
 			if(blocked) break;
 		}
+
 	},
 
 	/**
 	 * Sets flag lit to false on all tiles within radius of position specified
 	 * @protected
+	 *
+	 * @return {Array} An empty array
 	 */
 	clear: function() {
+
 		var i = this.tiles.length;
 		while(i--) {
 			this.tiles[i].lightLevel = 0;
@@ -1443,6 +1864,7 @@ Roguelike.Systems.LightMap.prototype = {
 		var o = this.tiles;
 		this.tiles = [];
 		return o;
+
 	},
 
 	/**
@@ -1451,11 +1873,16 @@ Roguelike.Systems.LightMap.prototype = {
 	 *
 	 * @param {Roguelike.Components.LightSource} lightSource - The lightsource that is being calculated
 	 * @param {Roguelike.Components.Position} position - The position of the lightsource
+	 *
+	 * @return {Array} An array containing all tiles
 	 */
 	calculate: function(lightSource, position) {
+
 		for(var i = 0; i < 8; i++) {
+
 			this.calculateOctant(position, 1, 1.0, 0.0, lightSource,
 				this.mult[0][i], this.mult[1][i], this.mult[2][i], this.mult[3][i], 0);
+
 		}
 
 		//Push this tile and it's light level's in the tiles array
@@ -1467,220 +1894,6 @@ Roguelike.Systems.LightMap.prototype = {
 
 		//Return the tiles
 		return this.tiles;
-	},
-
-	/**
-	 * Function that gets called when the game continues one tick
-	 * @protected
-	 */
-	update: function() {
-
-		//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
-		var entities = this.game.map.entities.getEntities("lightSource", "position");
-
-		//Loop through all matching entities
-		for(var i = 0; i < entities.length; i++) {
-
-			//Get the keyboardControl component
-			var lightSourceComponent = entities[i].getComponent("lightSource");
-			var positionComponent = entities[i].getComponent("position");
-
-			//Update the lightsource
-			var newLight = this.clear().concat(this.calculate(lightSourceComponent, positionComponent.position));
-
-			//Update the tiles on the map with the new light levels
-			for(var l = 0; l < newLight.length; l++) {
-				this.game.map.tiles[newLight[l].x][newLight[l].y].lightLevel = newLight[l].lightLevel;
-				this.game.map.tiles[newLight[l].x][newLight[l].y].explored = true;
-			}
-
-		}
-
-	}
-
-};
-
-Roguelike.Systems.Control = function(game) {
-
-	/**
-	 * @property {Roguelike.Game} game - Reference to the current game object
-	 */
-	this.game = game;
-
-	/**
-	 * @property {Roguelike.Keyboard} keyboard - Reference to the keyboard object
-	 */
-	this.keyboard = null;
-
-	/**
-	 * @property {Roguelike.Key} upKey - Reference to up key on the keyboard
-	 */
-	this.upKey = null;
-
-	/**
-	 * @property {Roguelike.Key} downKey - Reference to down key on the keyboard
-	 */
-	this.downKey = null;
-
-	/**
-	 * @property {Roguelike.Key} leftKey - Reference to left key on the keyboard
-	 */
-	this.leftKey = null;
-
-	/**
-	 * @property {Roguelike.Key} rightKey - Reference to right key on the keyboard
-	 */
-	this.rightKey = null;
-
-	//Initialize itself
-	this.initialize();
-
-};
-
-Roguelike.Systems.Control.prototype = {
-
-	/**
-	 * The 'constructor' for this component
-	 * Sets up the right keys and sets functions on them
-	 * @protected
-	 */
-	initialize: function() {
-
-		//Create a new keyboard
-		this.keyboard = new Roguelike.Keyboard(this);
-		this.keyboard.initialize();
-
-		//Reference to the current system
-		var _this = this;
-
-		//Add up key and tell it to move the entities up when it hits
-		this.upKey = this.keyboard.getKey(38);
-
-		//Function to perform
-		var moveUp = function() {
-			_this.keyHandler(38);
-		};
-
-		//Attach the function to the keydown event
-		this.upKey.onDown.on(38, moveUp, _this);
-
-		//Add down key and tell it to move the entities down when it hits
-		this.downKey = this.keyboard.getKey(40);
-
-		//Function to perform
-		var moveDown = function() {
-			_this.keyHandler(40);
-		};
-
-		//Attach the function to the keydown event
-		this.downKey.onDown.on(40, moveDown, _this);
-
-		//Add left key and tell it to move the entities left when it hits
-		this.leftKey = this.keyboard.getKey(37);
-
-		//Function to perform
-		var moveLeft = function() {
-			_this.keyHandler(37);
-		};
-
-		//Attach the function to the keydown event
-		this.leftKey.onDown.on(37, moveLeft, _this);
-
-		//Add right key and tell it to move the entities right when it hits
-		this.rightKey = this.keyboard.getKey(39);
-
-		//Function to perform
-		var moveRight = function() {
-			_this.keyHandler(39);
-		};
-
-		//Attach the function to the keydown event
-		this.rightKey.onDown.on(39, moveRight, _this);
-
-	},
-
-	/**
-	 * Function to queue movement onto entities that have the keyboard control component
-	 * @protected
-	 *
-	 * @param {Number} key - The keycode of the move being queued
-	 */
-	keyHandler: function(key) {
-
-		//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
-		//TODO: Don't get this entire list three times
-		var entities = this.game.map.entities.getEntities("keyboardControl", "position");
-
-		//Loop through all matching entities
-		for(var i = 0; i < entities.length; i++) {
-
-			//Add this direction to it's movement queue
-			this.queueMovement(key, entities[i]);
-
-		}
-
-		//All the entities movements are queued, it's time to update the other game mechanics
-		this.game.update();
-
-	},
-
-	/**
-	 * Function that gets called when the game continues one tick
-	 * @protected
-	 */
-	update: function() {
-
-		//Nothing here, yet..
-
-	},
-
-	/**
-	 * The function that gets called when the player moves
-	 * @protected
-	 *
-	 * @param {Number} direction - The direction the entities are being moved
-	 * @param {Roguelike.Entity} entity - The entity that is being controlled
-	 */
-	queueMovement: function(direction, entity) {
-
-		//Get the current entities position component
-		var positionComponent = entity.getComponent("position");
-
-		//Define variables
-		var newPosition;
-
-		//Check which controls are being pressed and update the player accordingly
-		switch(direction) {
-
-			case (37): //Left
-
-				newPosition = new Roguelike.Vector2(positionComponent.position.x - 1, positionComponent.position.y);
-
-				break;
-
-			case (38): //Up
-
-				newPosition = new Roguelike.Vector2(positionComponent.position.x, positionComponent.position.y - 1);
-
-				break;
-
-			case (39): //Right
-
-				newPosition = new Roguelike.Vector2(positionComponent.position.x + 1, positionComponent.position.y);
-
-				break;
-
-			case (40): //Down
-
-				newPosition = new Roguelike.Vector2(positionComponent.position.x, positionComponent.position.y + 1);
-
-				break;
-
-		}
-
-		//Push the new position to the queue
-		positionComponent.actions.push(newPosition);
-
 	}
 
 };
@@ -1697,50 +1910,32 @@ Roguelike.Systems.Movement = function(game) {
 Roguelike.Systems.Movement.prototype = {
 
 	/**
-	 * Function that gets called when the game continues one tick
+	 * Performs the needed operations for this specific system on one entity
 	 * @protected
+	 *
+	 * @param {Roguelike.Entity} entity - The entity that is being processed by this system
+	 * @param {Object} newPosition - The new x or y coordinates the entity is trying to move to
 	 */
-	update: function() {
+	handleSingleEntity : function(entity, newPosition){
 
-		//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
-		var entities = this.game.map.entities.getEntities("position");
+		//Get components
+		var positionComponent = entity.getComponent("position");
 
-		//Loop through all matching entities
-		for(var i = 0; i < entities.length; i++) {
+		//Check if the new position is correct
+		if(this.canMove(entity, newPosition)) {
 
-			//Get the components
-			var positionComponent = entities[i].getComponent("position");
+			//Get the tile to which the entity is trying to move
+			var currentTile = this.game.map.tiles[positionComponent.position.x][positionComponent.position.y];
+			var nextTile = this.game.map.tiles[newPosition.x][newPosition.y];
 
-			//Loop through the actions
-			for(var a = positionComponent.actions.length - 1; a >= 0; a--) {
+			//Remove the entity from the tile it's currently on
+			currentTile.removeEntity(entity);
 
-				//Pop the action from the "stack"
-				var newPosition = positionComponent.actions[a];
+			//And add him to the next tile that he is going to be on
+			nextTile.addEntity(entity);
 
-				//Check if the new position is correct
-				if(this.canMove(entities[i], newPosition)) {
-
-					//Get the tile to which the entity is trying to move
-					var currentTile = this.game.map.tiles[positionComponent.position.x][positionComponent.position.y];
-					var nextTile = this.game.map.tiles[newPosition.x][newPosition.y];
-
-					//Remove the entity from the tile it's currently on
-					//TODO: Make a function out of this, because it's also being used in the Combat System
-					var currentEntityPosition = currentTile.entities.indexOf(entities[i]);
-					currentTile.entities.splice(currentEntityPosition, 1);
-
-					//And add him to the next tile that he is going to be on
-					nextTile.entities.push(entities[i]);
-
-					//Pop the new position from the "stack"
-					positionComponent.position = newPosition;
-
-				}
-
-				//The new position is either invalid or successful, remove the action from the queue
-				positionComponent.actions.splice(a, 1);
-
-			}
+			//Pop the new position from the "stack"
+			positionComponent.position = newPosition;
 
 		}
 
@@ -1752,6 +1947,8 @@ Roguelike.Systems.Movement.prototype = {
 	 *
 	 * @param {Roguelike.Entity} entity - The entity that is being checked against the map
 	 * @param {Object} newPosition - The new position the entity is trying to move to
+	 *
+	 * @return {Boolean} True when an entity can move to the new position, false when the entity is obstructed
 	 */
 	canMove: function(entity, newPosition) {
 
@@ -1787,8 +1984,12 @@ Roguelike.Systems.Movement.prototype = {
 
 					//Get the collide component
 					var collideComponent = nextTile.entities[i].getComponent("collide");
+
+					//If collide is true, it means we can't walk to the next tile
 					if(collideComponent.collide === true) {
+
 						return false;
+
 					}
 
 				}
@@ -1833,35 +2034,51 @@ Roguelike.Systems.Combat.prototype = {
 		//Loop through all matching entities
 		for(var i = 0; i < entities.length; i++) {
 
-			//Get the components from the current entity and store them temporarily in a variable
-			var canFightComponent = entities[i].getComponent("canFight");
-			var weaponComponent = entities[i].getComponent("weapon");
+			//Perform the needed operations for this specific system on one entity
+			this.handleSingleEntity(entities[i]);
 
-			//Check if any actions need to be performed on this entity
-			if(canFightComponent.actions.length !== 0) {
+		}
 
-				//Loop through the actions
-				for(var a = canFightComponent.actions.length; a > 0; a--) {
+		//Loop through the enemies that are dead and need to be removed
+		this.removeEntities();
 
-					//Pop the action from the "stack"
-					var currentEnemy = canFightComponent.actions.pop();
+	},
 
-					//Check if the enemy even has a health component before we try to hit it
-					if(currentEnemy.hasComponent("health")) {
+	/**
+	 * Performs the needed operations for this specific system on one entity
+	 * @protected
+	 *
+	 * @param {Roguelike.Entity} entity - The entity that is being processed by this system
+	 */
+	handleSingleEntity : function(entity){
 
-						//Get the current entities components
-						var healthComponent = currentEnemy.getComponent("health");
+		//Get the components from the current entity and store them temporarily in a variable
+		var canFightComponent = entity.getComponent("canFight");
+		var weaponComponent = entity.getComponent("weapon");
 
-						//The weapon of the current entity should damage to the current enemy
-						healthComponent.takeDamage(weaponComponent.damage);
+		//Check if any actions need to be performed on this entity
+		if(canFightComponent.actions.length !== 0) {
 
-						//If the enemy is dead, we have to remove him from the game
-						if(healthComponent.isDead()) {
+			//Loop through the actions
+			for(var a = canFightComponent.actions.length; a > 0; a--) {
 
-							//Add the current enemy to the remove stack, this way the loop doesn't get interrupted
-							this.toRemove.push(currentEnemy);
+				//Pop the action from the "stack"
+				var currentEnemy = canFightComponent.actions.pop();
 
-						}
+				//Check if the enemy even has a health component before we try to hit it
+				if(currentEnemy.hasComponent("health")) {
+
+					//Get the current entities components
+					var healthComponent = currentEnemy.getComponent("health");
+
+					//The weapon of the current entity should damage to the current enemy
+					healthComponent.takeDamage(weaponComponent.damage);
+
+					//If the enemy is dead, we have to remove him from the game
+					if(healthComponent.isDead()) {
+
+						//Add the current enemy to the remove stack, this way the loop doesn't get interrupted
+						this.toRemove.push(currentEnemy);
 
 					}
 
@@ -1871,22 +2088,31 @@ Roguelike.Systems.Combat.prototype = {
 
 		}
 
-		//Loop through the enemies that are dead and need to be removed
+	},
+
+	/**
+	 * Loop through the enemies that are dead and need to be removed
+	 * @protected
+	 */
+	removeEntities: function(){
+
+		//Loop through all entities in the stack
 		for(var entity; entity = this.toRemove.pop();) {
 
 			//Remove the entity from the map's list
 			this.game.map.entities.removeEntity(entity);
 
-			//Get the components of this enity
+			//Remove the entity from the scheduler
+			this.game.scheduler.remove(entity);
+
+			//Get the components of this entity
 			var positionComponent = entity.getComponent("position");
 
 			//Get the tile that the entity ws standing on
 			var currentTile = this.game.map.tiles[positionComponent.position.x][positionComponent.position.y];
 
 			//Remove the entity from the tile it was standing on
-			//TODO: Use Roguelike.Utils function for this
-			var currentEntityPosition = currentTile.entities.indexOf(entity);
-			currentTile.entities.splice(currentEntityPosition, 1);
+			currentTile.removeEntity(entity);
 
 		}
 
@@ -1926,6 +2152,7 @@ Roguelike.Systems.PathFinding.prototype = {
 		this.easystar.setGrid(this.game.map.typeList());
 
 		//Disable diagonals
+		//TODO: Enable diagonal movement and make sure the player can also move diagonal
 		this.easystar.disableDiagonals();
 
 		//Set the acceptable tiles to walk on
@@ -1935,58 +2162,61 @@ Roguelike.Systems.PathFinding.prototype = {
 	},
 
 	/**
-	 * Function that gets called when the game continues one tick
+	 * Performs the needed operations for this specific system on one entity
 	 * @protected
+	 *
+	 * @param {Roguelike.Entity} entity - The entity that is being processed by this system
 	 */
-	update: function() {
+	handleSingleEntity : function(entity){
 
-		//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
-		var entities = this.game.map.entities.getEntities("behaviour", "position");
+		//Get the components from the current entity and store them temporarily in a variable
+		var positionComponent = entity.getComponent("position");
 
-		//Loop through all matching entities
-		for(var i = 0; i < entities.length; i++) {
+		//TODO: Make this dynamic, not every enemy should chase the player
+		var behaviour = "attack";
 
-			//Get the components from the current entity and store them temporarily in a variable
-			var behaviourComponent = entities[i].getComponent("behaviour");
-			var positionComponent = entities[i].getComponent("position");
+		//Check the behaviour of the entity
+		switch(behaviour) {
 
-			//Check the behaviour of the entity
-			switch(behaviourComponent.behaviour) {
+			case("attack"):
 
-				case("attack"):
+				//Get the player
+				var player = this.game.player;
+				var playerPositionComponent = player.getComponent("position");
 
-					//Get the player
-					var player = this.game.player;
-					var playerPositionComponent = player.getComponent("position");
+				//Initialize variables
+				var _this = this;
 
-					//Initialize variables
-					var nextPosition;
+				//If the entity is withing 10 tiles of the player, walk to the player
+				if(positionComponent.position.manhattan(playerPositionComponent.position) < 10) {
 
-					//If the entity is withing 10 tiles of the player, walk to the player
-					if(positionComponent.position.manhattan(playerPositionComponent.position) < 10) {
+					//Let EasyStar calculate a path towards the player find a path
+					this.easystar.findPath(positionComponent.position.x, positionComponent.position.y, playerPositionComponent.position.x, playerPositionComponent.position.y, function(path) {
 
-						//Let EasyStar calculate a path towards the player find a path
-						this.easystar.findPath(positionComponent.position.x, positionComponent.position.y, playerPositionComponent.position.x, playerPositionComponent.position.y, function(path) {
+						//TODO: Make sure enemies don't kill eachother, they have to find another route or collaborate
+						if(path === null || path.length === 0) {
 
-							//TODO: Make sure enemies don't kill eachother, they have to find another route or collaborate
-							if(path === null || path.length === 0) {
-								console.log("no path found");
-							}else{
-								nextPosition = new Roguelike.Vector2(path[1].x, path[1].y);
-								positionComponent.actions.push(nextPosition);
-							}
+							console.log("no path found");
 
-						});
+						}else{
 
-						//TODO: Find out is this is still needed, i dont think so.
-						this.easystar.calculate();
+							//Create a new Vector2 object of the new position
+							var newPosition = new Roguelike.Vector2(path[1].x, path[1].y);
+
+							//Tell the movement system that you want to move to the new position
+							_this.game.movementSystem.handleSingleEntity(entity, newPosition);
+
+						}
+
+					});
+
+					//Calculate the path
+					this.easystar.calculate();
 
 
-					}
+				}
 
-					break;
-
-			}
+				break;
 
 		}
 
@@ -2001,12 +2231,16 @@ Roguelike.PlayerFactory = {
 	 * Function that returns a new warrior
 	 * @public
 	 *
+	 * @param {Roguelike.Game} game - Reference to the currently running game
 	 * @param {Roguelike.Vector2} position - The position object of this entity
+	 * @param {Object} controls - Associative array with every control this entity uses
+	 *
+	 * @return {Roguelike.Entity} A player entity
 	 */
-	newPlayerWarrior: function(position) {
+	newPlayerWarrior: function(game, position, controls) {
 
 		//Create the entity
-		var entity = new Roguelike.Entity();
+		var entity = new Roguelike.Entity(game, 1000);
 
 		//Give the player a health of 100 points
 		entity.addComponent(new Roguelike.Components.Health(100));
@@ -2018,7 +2252,11 @@ Roguelike.PlayerFactory = {
 		entity.addComponent(new Roguelike.Components.Sprite("entities", 0, 0));
 
 		//The player must be controllable by the keyboards arrow keys
-		entity.addComponent(new Roguelike.Components.KeyboardControl());
+		entity.addComponent(new Roguelike.Components.KeyboardControl(
+			entity,
+			game,
+			controls
+		));
 
 		//Add a lightsource to the player
 		entity.addComponent(new Roguelike.Components.LightSource(true, 6));
@@ -2043,15 +2281,18 @@ Roguelike.PlayerFactory = {
 Roguelike.EnemyFactory = {
 
 	/**
-	 * Function that returns a new skeleton entity
+	 * Function that returns a new spider entity
 	 * @public
 	 *
+	 * @param {Roguelike.Game} game - Reference to the currently running game
 	 * @param {Roguelike.Vector2} position - The position object of this entity
+	 *
+	 * @return {Roguelike.Entity} An enemy entity
 	 */
-	newSkeleton: function(position) {
+	newSpider: function(game, position) {
 
 		//Create the entity
-		var entity = new Roguelike.Entity();
+		var entity = new Roguelike.Entity(game, 2000);
 
 		//Give the entity a health of 100 points
 		entity.addComponent(new Roguelike.Components.Health(20));
@@ -2060,10 +2301,17 @@ Roguelike.EnemyFactory = {
 		entity.addComponent(new Roguelike.Components.Position(position));
 
 		//The entity has a sprite
-		entity.addComponent(new Roguelike.Components.Sprite("entities", 0, 2));
+		entity.addComponent(new Roguelike.Components.Sprite("entities", 1, 2));
 
 		//You can collide with this entity
 		entity.addComponent(new Roguelike.Components.Collide(true));
+
+		//Add a certain move behaviour to this entity
+		entity.addComponent(new Roguelike.Components.Movement(
+			game,
+			entity,
+			Roguelike.moveBehaviours.walkBehaviour()
+		));
 
 		//The entity has a weapon
 		//TODO: Change this to a loadout. Something that says: Hey you are wearing this and this and this
@@ -2071,9 +2319,6 @@ Roguelike.EnemyFactory = {
 
 		//This entity is capable of fighting
 		entity.addComponent(new Roguelike.Components.CanFight());
-
-		//This entity has a certain behaviour
-		entity.addComponent(new Roguelike.Components.Behaviour("attack"));
 
 		//Return the entity
 		return entity;
@@ -2088,12 +2333,15 @@ Roguelike.PropFactory = {
 	 * Function that returns a new door
 	 * @public
 	 *
+	 * @param {Roguelike.Game} game - Reference to the currently running game
 	 * @param {Roguelike.Vector2} position - The position object of this entity
+	 *
+	 * @return {Roguelike.Entity} An prop entity
 	 */
-	newDoor: function(position) {
+	newDoor: function(game, position) {
 
 		//Create the entity
-		var entity = new Roguelike.Entity();
+		var entity = new Roguelike.Entity(game);
 
 		//The starting position of the entity
 		entity.addComponent(new Roguelike.Components.Position(position));
@@ -2120,12 +2368,15 @@ Roguelike.DecorationFactory = {
 	 * Function that returns a grass object
 	 * @public
 	 *
+	 * @param {Roguelike.Game} game - Reference to the currently running game
 	 * @param {Roguelike.Vector2} position - The position object of this entity
+	 *
+	 * @return {Roguelike.Entity} A decoration entity
 	 */
-	newGrass: function(position) {
+	newGrass: function(game, position) {
 
 		//Create the entity
-		var entity = new Roguelike.Entity();
+		var entity = new Roguelike.Entity(game);
 
 		//The starting position of the entity
 		entity.addComponent(new Roguelike.Components.Position(position));
@@ -2319,17 +2570,15 @@ Roguelike.Key.prototype = {
 
 };
 
-Roguelike.Keyboard = function(game) {
-
-	/**
-	 * @property {Roguelike.Game} game - Reference to the current game object
-	 */
-	this.game = game;
+Roguelike.Keyboard = function() {
 
 	/**
 	 * @property {Object} keys - Object that holds all keys
 	 */
 	this.keys = {};
+
+	//Initialize itself
+	this.initialize();
 
 };
 
@@ -2366,6 +2615,8 @@ Roguelike.Keyboard.prototype = {
 	 * @protected
 	 *
 	 * @param {Number} keycode - The keycode of the key being added
+	 *
+	 * @return {Roguelike.Key} The Roguelike.Key object
 	 */
 	getKey: function(keycode) {
 
@@ -2467,6 +2718,54 @@ Roguelike.Tile = function(type, blockLight, room, tileRow, tileNumber) {
 
 };
 
+Roguelike.Tile.prototype = {
+
+	/**
+	 * Function that adds an entity to a tile
+	 * @protected
+	 *
+	 * @param {Roguelike.Entity} entity - The entity being removed from a tile
+	 */
+	addEntity: function(entity){
+
+		//Aad the entity to the list
+		this.entities.push(entity);
+
+	},
+
+	/**
+	 * Function that removes an entity from a tile
+	 * @protected
+	 *
+	 * @param {Roguelike.Entity} entity - The entity being removed from a tile
+	 *
+	 * @return {Boolean} Returns true on success, returns false on failure
+	 */
+	removeEntity: function(entity) {
+
+		//Get the current position of the entity
+		var index = this.entities.indexOf(entity);
+
+		//If the entity exists, remove it
+		if(index === -1){
+
+			//The entity doesn't even exist on this tile
+			return false;
+
+		}else{
+
+			//Remove the entity from the tile
+			this.entities.splice(index, 1);
+
+			//We have removed the entity
+			return true;
+
+		}
+
+	}
+
+};
+
 Roguelike.Map = function(game) {
 
 	/**
@@ -2549,6 +2848,9 @@ Roguelike.Map = function(game) {
 	 */
 	this.exit = null;
 
+	//Initialize itself
+	this.initialize();
+
 };
 
 Roguelike.Map.prototype = {
@@ -2584,6 +2886,8 @@ Roguelike.Map.prototype = {
 	 * Function that returns an array with only the tiletypes of every position
 	 * Used for EasyStar Pathfinding
 	 * @protected
+	 *
+	 * @return {Array} Array with only the tiletypes of every position on the map
 	 */
 	typeList: function() {
 
@@ -2616,6 +2920,8 @@ Roguelike.Map.prototype = {
 	 * @protected
 	 *
 	 * @param {Roguelike.Room} room - The room object that has to be checked
+	 *
+	 * @return {Boolean} True when the room intersects with an existing room, false when it's not intersecting
 	 */
 	roomIntersectsWith: function(room) {
 
@@ -2696,7 +3002,7 @@ Roguelike.MapFactory.prototype = {
 		var map = this.game.map;
 
 		//Maximum number of tries before stopping the placement of more rooms
-		var maxTries = this.game.map.maxRooms + 10;
+		var maxTries = 15;
 		var tries = 0;
 
 		//Create rooms and add them to the list
@@ -3002,7 +3308,7 @@ Roguelike.MapFactory.prototype = {
 		var tileAtPosition = this.game.map.tiles[position.x][position.y];
 
 		//Create the door entity
-		var doorEntity = Roguelike.PropFactory.newDoor(position);
+		var doorEntity = Roguelike.PropFactory.newDoor(this.game, position);
 
 		if(orientation === true) {
 			doorEntity.components.sprite.number = 0;
@@ -3013,7 +3319,7 @@ Roguelike.MapFactory.prototype = {
 		this.game.map.entities.addEntity(doorEntity);
 
 		//Add the door entity to the entities list on the current tile
-		tileAtPosition.entities.push(doorEntity);
+		tileAtPosition.addEntity(doorEntity);
 
 		//A door blocks light!
 		tileAtPosition.blockLight = true;
@@ -3047,14 +3353,14 @@ Roguelike.MapFactory.prototype = {
 		//TODO: Place these entities in a factory
 
 		//Create the entrance entity
-		var entranceEntity = new Roguelike.Entity();
+		var entranceEntity = new Roguelike.Entity(this.game);
 
 		//Add components to the entrance entity
 		entranceEntity.addComponent(new Roguelike.Components.Position(entrancePosition));
 		entranceEntity.addComponent(new Roguelike.Components.Sprite("tileset", 3, 1));
 
 		//Create the entrance entity
-		var exitEntity = new Roguelike.Entity();
+		var exitEntity = new Roguelike.Entity(this.game);
 
 		//Add components to the exit entity
 		exitEntity.addComponent(new Roguelike.Components.Position(exitPosition));
@@ -3170,11 +3476,12 @@ Roguelike.MapFactory.prototype = {
 
 						//Create a new grass entity
 						grassEntity = new Roguelike.DecorationFactory.newGrass(
+							this.game,
 							new Roguelike.Vector2(x, y)
 						);
 
 						//Add the entity to the tile on the map
-						map.tiles[x][y].entities.push(grassEntity);
+						map.tiles[x][y].addEntity(grassEntity);
 
 						//Add the entity to the map
 						map.entities.addEntity(grassEntity);
@@ -3185,15 +3492,21 @@ Roguelike.MapFactory.prototype = {
 					if(Roguelike.Utils.randomNumber(0, 100) >= 100) {
 
 						//Create a new skeleton
-						enemyEntity = new Roguelike.EnemyFactory.newSkeleton(
+						enemyEntity = new Roguelike.EnemyFactory.newSpider(
+							this.game,
 							new Roguelike.Vector2(x, y)
 						);
 
+						//TODO: Make a function out of the following steps:
+
 						//Add the entity to the tile on the map
-						map.tiles[x][y].entities.push(enemyEntity);
+						map.tiles[x][y].addEntity(enemyEntity);
 
 						//Add the entity to the map
 						map.entities.addEntity(enemyEntity);
+
+						//Add the enemy to the scheduler
+						this.game.scheduler.add(enemyEntity, true);
 
 					}
 
@@ -3330,6 +3643,8 @@ Roguelike.Room.prototype = {
 	/**
 	 * Returns a random position that is inside the current room
 	 * @protected
+	 *
+	 * @return {Roguelike.Vector2} Vector2 object of a random position inside the room
 	 */
 	getRandomPosition: function() {
 
@@ -3893,6 +4208,16 @@ if(typeof define === "function" && define.amd) {
 		return EasyStar;
 	});
 }
+
+// shim layer with setTimeout fallback
+window.requestAnimFrame = (function(){
+	return window.requestAnimationFrame    ||
+		window.webkitRequestAnimationFrame ||
+		window.mozRequestAnimationFrame    ||
+		function( callback ){
+			window.setTimeout(callback, 1000 / 60);
+		};
+})();
 
 window.onload = function() {
 
