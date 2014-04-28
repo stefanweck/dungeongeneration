@@ -53,7 +53,7 @@ var Roguelike = Roguelike || {
 Roguelike.Game = function(userSettings) {
 
 	/**
-	 * @property {bool} isInitialized - Boolean to see if the game is already initialized
+	 * @property {Boolean} isInitialized - Boolean to see if the game is already initialized
 	 */
 	this.isInitialized = false;
 
@@ -78,7 +78,7 @@ Roguelike.Game = function(userSettings) {
 	this.player = null;
 
 	/**
-	 * @property {object} settings - The default settings
+	 * @property {Object} settings - The default settings
 	 */
 	this.settings = {
 		canvas: null,
@@ -199,8 +199,8 @@ Roguelike.Utils = {
 	 * Function to generate a random number between two values
 	 * @public
 	 *
-	 * @param {number} from - The minimum number
-	 * @param {number} to - The maximum number
+	 * @param {Number} from - The minimum number
+	 * @param {Number} to - The maximum number
 	 */
 	randomNumber: function(from, to) {
 
@@ -213,8 +213,8 @@ Roguelike.Utils = {
 	 * Function to extend the default options with the users options
 	 * @public
 	 *
-	 * @param {object} a - The original object to extend
-	 * @param {object} b - The new settings that override the original object
+	 * @param {Object} a - The original object to extend
+	 * @param {Object} b - The new settings that override the original object
 	 */
 	extend: function(a, b) {
 
@@ -234,8 +234,8 @@ Roguelike.Utils = {
 	 * Function to check if an object is in a list
 	 * @public
 	 *
-	 * @param {object} object - The object to search for
-	 * @param {array} list - The list, aka the array
+	 * @param {Object} object - The object to search for
+	 * @param {Array} list - The list, aka the array
 	 */
 	//TODO: This function should always have the same return type
 	contains: function(object, list) {
@@ -264,32 +264,32 @@ Roguelike.Camera = function(game, position) {
 	this.game = game;
 
 	/**
-	 * @property {object} position - The x and y top left coordinates of this camera, in pixels
+	 * @property {Object} position - The x and y top left coordinates of this camera, in pixels
 	 */
 	this.position = position;
 
 	/**
-	 * @property {number} viewportWidth - The width of the game's canvas, in pixels
+	 * @property {Number} viewportWidth - The width of the game's canvas, in pixels
 	 */
 	this.viewportWidth = game.settings.canvas.width;
 
 	/**
-	 * @property {number} viewportHeight - The height of the game's canvas, in pixels
+	 * @property {Number} viewportHeight - The height of the game's canvas, in pixels
 	 */
 	this.viewportHeight = game.settings.canvas.height;
 
 	/**
-	 * @property {number} minimumDistanceX - The minimal distance from horizontal borders before the camera starts to move, in pixels
+	 * @property {Number} minimumDistanceX - The minimal distance from horizontal borders before the camera starts to move, in pixels
 	 */
 	this.minimumDistanceX = 0;
 
 	/**
-	 * @property {number} minimumDistanceY - The minimal distance from vertical borders before the camera starts to move, in pixels
+	 * @property {Number} minimumDistanceY - The minimal distance from vertical borders before the camera starts to move, in pixels
 	 */
 	this.minimumDistanceY = 0;
 
 	/**
-	 * @property {object} followObject - The object that should be followed by the camera
+	 * @property {Object} followObject - The object that should be followed by the camera
 	 */
 	this.followObject = null;
 
@@ -322,8 +322,8 @@ Roguelike.Camera.prototype = {
 	 * @protected
 	 *
 	 * @param {Roguelike.Entity} followEntity - The entity that should be followed by the camera, this entity is required to have the position component
-	 * @param {number} minimumDistanceX - The minimal distance from horizontal borders before the camera starts to move
-	 * @param {number} minimumDistanceY - The minimal distance from vertical borders before the camera starts to move
+	 * @param {Number} minimumDistanceX - The minimal distance from horizontal borders before the camera starts to move
+	 * @param {Number} minimumDistanceY - The minimal distance from vertical borders before the camera starts to move
 	 */
 	follow: function(followEntity, minimumDistanceX, minimumDistanceY) {
 
@@ -413,12 +413,12 @@ Roguelike.Camera.prototype = {
 Roguelike.Vector2 = function(x, y) {
 
 	/**
-	 * @property {number} x - The x coordinate of this vector2 object
+	 * @property {Number} x - The x coordinate of this vector2 object
 	 */
 	this.x = x;
 
 	/**
-	 * @property {number} x - The y coordinate of this vector2 object
+	 * @property {Number} x - The y coordinate of this vector2 object
 	 */
 	this.y = y;
 
@@ -445,7 +445,7 @@ Roguelike.Vector2.prototype = {
 	 * Distance to another Vector2 Object
 	 * @protected
 	 *
-	 * @param {object} pos - The position of the other object
+	 * @param {Object} pos - The position of the other object
 	 */
 	distance: function(pos) {
 
@@ -460,7 +460,7 @@ Roguelike.Vector2.prototype = {
 	 * Manhattan distance to another object
 	 * @protected
 	 *
-	 * @param {object} pos - The position of the other object
+	 * @param {Object} pos - The position of the other object
 	 */
 	manhattan: function(pos) {
 
@@ -493,32 +493,32 @@ Roguelike.Vector2.prototype = {
 Roguelike.Boundary = function(left, top, width, height) {
 
 	/**
-	 * @property {number} left - The left position of this boundary, in pixels
+	 * @property {Number} left - The left position of this boundary, in pixels
 	 */
 	this.left = left || 0;
 
 	/**
-	 * @property {number} top - The top position of this boundary, in pixels
+	 * @property {Number} top - The top position of this boundary, in pixels
 	 */
 	this.top = top || 0;
 
 	/**
-	 * @property {number} width - The width of this boundary, in pixels
+	 * @property {Number} width - The width of this boundary, in pixels
 	 */
 	this.width = width || 0;
 
 	/**
-	 * @property {number} height - The height of this boundary, in pixels
+	 * @property {Number} height - The height of this boundary, in pixels
 	 */
 	this.height = height || 0;
 
 	/**
-	 * @property {number} right - The right position of this boundary, in pixels
+	 * @property {Number} right - The right position of this boundary, in pixels
 	 */
 	this.right = (this.left + this.width);
 
 	/**
-	 * @property {number} bottom - The bottom position of this boundary, in pixels
+	 * @property {Number} bottom - The bottom position of this boundary, in pixels
 	 */
 	this.bottom = (this.top + this.height);
 
@@ -530,10 +530,10 @@ Roguelike.Boundary.prototype = {
 	 * Function that allows the user to set new values for the boundary
 	 * @protected
 	 *
-	 * @param {number} left - The left position of this boundary, in pixels
-	 * @param {number} top - The top position of this boundary, in pixels
-	 * @param {number} width - Optional: The width of this boundary, in pixels
-	 * @param {number} height - Optional: The height of this boundary, in pixels
+	 * @param {Number} left - The left position of this boundary, in pixels
+	 * @param {Number} top - The top position of this boundary, in pixels
+	 * @param {Number} width - Optional: The width of this boundary, in pixels
+	 * @param {Number} height - Optional: The height of this boundary, in pixels
 	 */
 	set: function(left, top, width, height) {
 
@@ -585,7 +585,7 @@ Roguelike.Boundary.prototype = {
 Roguelike.Entity = function() {
 
 	/**
-	 * @property {object} components - An object filled with all the components this entity has
+	 * @property {Object} components - An object filled with all the components this entity has
 	 */
 	this.components = {};
 
@@ -669,7 +669,7 @@ Roguelike.Group = function(game) {
 	this.game = game;
 
 	/**
-	 * @property {array} entities - Collection of all the entities in this group
+	 * @property {Array} entities - Collection of all the entities in this group
 	 */
 	this.entities = [];
 
@@ -773,12 +773,12 @@ Roguelike.Components.Sprite = function(sprite, row, tile) {
 	this.sprite = sprite;
 
 	/**
-	 * @property {number} row - The row that the sprite is on, on the tileset
+	 * @property {Number} row - The row that the sprite is on, on the tileset
 	 */
 	this.row = row;
 
 	/**
-	 * @property {number} tile - The specific tile that the sprite is on, on the tileset
+	 * @property {Number} tile - The specific tile that the sprite is on, on the tileset
 	 */
 	this.tile = tile;
 
@@ -792,7 +792,7 @@ Roguelike.Components.Health = function(maxHealth) {
 	this.name = 'health';
 
 	/**
-	 * @property {number} health - The starting, and maximum health of the entity
+	 * @property {Number} health - The starting, and maximum health of the entity
 	 */
 	this.health = this.maxHealth = maxHealth;
 
@@ -842,7 +842,7 @@ Roguelike.Components.CanOpen = function() {
 	this.state = 'closed';
 
 	/**
-	 * @property {array} actions - The next actions to perform on this object
+	 * @property {Array} actions - The next actions to perform on this object
 	 */
 	this.actions = [];
 
@@ -891,12 +891,12 @@ Roguelike.Components.LightSource = function(gradient, radius) {
 	this.name = 'lightSource';
 
 	/**
-	 * @property {bool} gradient - Should the lightmap be drawn with a gradient
+	 * @property {Boolean} gradient - Should the lightmap be drawn with a gradient
 	 */
 	this.gradient = gradient;
 
 	/**
-	 * @property {number} radius - The radius of the light, how far does it shine it's magical light!
+	 * @property {Number} radius - The radius of the light, how far does it shine it's magical light!
 	 */
 	this.radius = radius;
 
@@ -910,7 +910,7 @@ Roguelike.Components.Collide = function(collide) {
 	this.name = 'collide';
 
 	/**
-	 * @property {bool} collide - True or false depending on if it should collide with other entities
+	 * @property {Boolean} collide - True or false depending on if it should collide with other entities
 	 */
 	this.collide = collide;
 
@@ -938,7 +938,7 @@ Roguelike.Components.Position = function(position) {
 	this.position = position;
 
 	/**
-	 * @property {array} actions - The next actions to perform on this object
+	 * @property {Array} actions - The next actions to perform on this object
 	 */
 	this.actions = [];
 
@@ -952,7 +952,7 @@ Roguelike.Components.Weapon = function(damage) {
 	this.name = 'weapon';
 
 	/**
-	 * @property {number} damage - The damage that this weapon does
+	 * @property {Number} damage - The damage that this weapon does
 	 */
 	this.damage = damage;
 
@@ -971,7 +971,7 @@ Roguelike.Components.CanFight = function() {
 	this.events = new Roguelike.Event();
 
 	/**
-	 * @property {array} actions - A stack with the next actions to perform on this object
+	 * @property {Array} actions - A stack with the next actions to perform on this object
 	 */
 	this.actions = [];
 
@@ -1030,17 +1030,17 @@ Roguelike.Systems.Render = function(game) {
 	this.game = game;
 
 	/**
-	 * @property {object} canvas - Reference to the canvas object everything is drawn on
+	 * @property {Object} canvas - Reference to the canvas object everything is drawn on
 	 */
 	this.canvas = null;
 
 	/**
-	 * @property {object} canvas - The 2D context of the current canvas object
+	 * @property {Object} canvas - The 2D context of the current canvas object
 	 */
 	this.context = null;
 
 	/**
-	 * @property {array} tileColors - Contains all the default colors for the tiles
+	 * @property {Array} tileColors - Contains all the default colors for the tiles
 	 */
 	this.tileColors = ['#302222', '#443939', '#6B5B45'];
 
@@ -1320,17 +1320,17 @@ Roguelike.Systems.LightMap = function(game) {
 	this.game = game;
 
 	/**
-	 * @property {object} mapSize - The size of the current map
+	 * @property {Object} mapSize - The size of the current map
 	 */
 	this.mapSize = {x: game.map.tilesX, y: game.map.tilesY};
 
 	/**
-	 * @property {object} tiles - Object that is being used to store tile data before returning it
+	 * @property {Object} tiles - Object that is being used to store tile data before returning it
 	 */
 	this.tiles = [];
 
 	/**
-	 * @property {array} mult - Multipliers for transforming coordinates into other octants
+	 * @property {Array} mult - Multipliers for transforming coordinates into other octants
 	 */
 	this.mult = [
 		[1, 0, 0, -1, -1, 0, 0, 1],
@@ -1347,8 +1347,8 @@ Roguelike.Systems.LightMap.prototype = {
 	 * Function that checks if a tile blocks light or not
 	 * @protected
 	 *
-	 * @param {number} x - The X position of the tile
-	 * @param {number} y - The Y position of the tile
+	 * @param {Number} x - The X position of the tile
+	 * @param {Number} y - The Y position of the tile
 	 */
 	doesTileBlock: function(x, y) {
 		return this.game.map.tiles[x][y].blockLight;
@@ -1603,7 +1603,7 @@ Roguelike.Systems.Control.prototype = {
 	 * Function to queue movement onto entities that have the keyboard control component
 	 * @protected
 	 *
-	 * @param {number} key - The keycode of the move being queued
+	 * @param {Number} key - The keycode of the move being queued
 	 */
 	keyHandler: function(key) {
 
@@ -1638,7 +1638,7 @@ Roguelike.Systems.Control.prototype = {
 	 * The function that gets called when the player moves
 	 * @protected
 	 *
-	 * @param {number} direction - The direction the entities are being moved
+	 * @param {Number} direction - The direction the entities are being moved
 	 * @param {Roguelike.Entity} entity - The entity that is being controlled
 	 */
 	queueMovement: function(direction, entity) {
@@ -1751,7 +1751,7 @@ Roguelike.Systems.Movement.prototype = {
 	 * @protected
 	 *
 	 * @param {Roguelike.Entity} entity - The entity that is being checked against the map
-	 * @param {object} newPosition - The new position the entity is trying to move to
+	 * @param {Object} newPosition - The new position the entity is trying to move to
 	 */
 	canMove: function(entity, newPosition) {
 
@@ -1813,7 +1813,7 @@ Roguelike.Systems.Combat = function(game) {
 	this.game = game;
 
 	/**
-	 * @property {array} toRemove - A stack with all the enemies that are going to be removed at the end of the turn
+	 * @property {Array} toRemove - A stack with all the enemies that are going to be removed at the end of the turn
 	 */
 	this.toRemove = [];
 
@@ -2143,7 +2143,7 @@ Roguelike.DecorationFactory = {
 Roguelike.Event = function() {
 
 	/**
-	 * @property {object} events - An object with all the current events
+	 * @property {Object} events - An object with all the current events
 	 */
 	this.events = {};
 
@@ -2155,9 +2155,9 @@ Roguelike.Event.prototype = {
 	 * Function that handles keydown events
 	 * @protected
 	 *
-	 * @param {object} event - The event object
-	 * @param {function} callback - The function that has to be performed as a callback
-	 * @param {object} context - The object that should be accessible when the event is called
+	 * @param {Object} event - The event object
+	 * @param {Function} callback - The function that has to be performed as a callback
+	 * @param {Object} context - The object that should be accessible when the event is called
 	 */
 	on: function(event, callback, context) {
 
@@ -2175,7 +2175,7 @@ Roguelike.Event.prototype = {
 	 * Function that is called when an event is triggered
 	 * @protected
 	 *
-	 * @param {object} event - The event object
+	 * @param {Object} event - The event object
 	 */
 	trigger: function(event) {
 
@@ -2224,32 +2224,32 @@ Roguelike.Event.prototype = {
 Roguelike.Key = function(keycode) {
 
 	/**
-	 * @property {number} keyCode - The keycode of this specific key
+	 * @property {Number} keyCode - The keycode of this specific key
 	 */
 	this.keyCode = keycode;
 
 	/**
-	 * @property {bool} isDown - Boolean to see if the key is down
+	 * @property {Boolean} isDown - Boolean to see if the key is down
 	 */
 	this.isDown = false;
 
 	/**
-	 * @property {bool} isUp - Boolean to see if the key is up
+	 * @property {Boolean} isUp - Boolean to see if the key is up
 	 */
 	this.isUp = false;
 
 	/**
-	 * @property {number} lastDown - Timestamp of the last key press
+	 * @property {Number} lastDown - Timestamp of the last key press
 	 */
 	this.lastDown = 0;
 
 	/**
-	 * @property {number} lastUp - Timestamp of the last key release
+	 * @property {Number} lastUp - Timestamp of the last key release
 	 */
 	this.lastUp = 0;
 
 	/**
-	 * @property {number} delay - Delay between two events on keydown
+	 * @property {Number} delay - Delay between two events on keydown
 	 */
 	this.delay = 50;
 
@@ -2271,7 +2271,7 @@ Roguelike.Key.prototype = {
 	 * Function that handles keydown events
 	 * @protected
 	 *
-	 * @param {object} event - The event object
+	 * @param {Object} event - The event object
 	 */
 	processKeyDown: function(event) {
 
@@ -2303,7 +2303,7 @@ Roguelike.Key.prototype = {
 	 * Function that handles keyup events
 	 * @protected
 	 *
-	 * @param {object} event - The event object
+	 * @param {Object} event - The event object
 	 */
 	processKeyUp: function(event) {
 
@@ -2327,7 +2327,7 @@ Roguelike.Keyboard = function(game) {
 	this.game = game;
 
 	/**
-	 * @property {object} keys - Object that holds all keys
+	 * @property {Object} keys - Object that holds all keys
 	 */
 	this.keys = {};
 
@@ -2365,7 +2365,7 @@ Roguelike.Keyboard.prototype = {
 	 * and add it if it does't exist yet
 	 * @protected
 	 *
-	 * @param {number} keycode - The keycode of the key being added
+	 * @param {Number} keycode - The keycode of the key being added
 	 */
 	getKey: function(keycode) {
 
@@ -2386,7 +2386,7 @@ Roguelike.Keyboard.prototype = {
 	 * Function that handles keydown events
 	 * @protected
 	 *
-	 * @param {object} event - The event object
+	 * @param {Object} event - The event object
 	 */
 	processKeyDown: function(event) {
 
@@ -2407,7 +2407,7 @@ Roguelike.Keyboard.prototype = {
 	 * Function that handles keydown events
 	 * @protected
 	 *
-	 * @param {object} event - The event object
+	 * @param {Object} event - The event object
 	 */
 	processKeyUp: function(event) {
 
@@ -2426,17 +2426,17 @@ Roguelike.Keyboard.prototype = {
 Roguelike.Tile = function(type, blockLight, room, tileRow, tileNumber) {
 
 	/**
-	 * @property {number} The kind of tile, wall, floor, void etc
+	 * @property {Number} The kind of tile, wall, floor, void etc
 	 */
 	this.type = type;
 
 	/**
-	 * @property {number} The row on the tileset that this current tile is on
+	 * @property {Number} The row on the tileset that this current tile is on
 	 */
 	this.tileRow = tileRow;
 
 	/**
-	 * @property {number} The number of tile in the row that this tile is. Starting from 0
+	 * @property {Number} The number of tile in the row that this tile is. Starting from 0
 	 */
 	this.tileNumber = tileNumber;
 
@@ -2446,22 +2446,22 @@ Roguelike.Tile = function(type, blockLight, room, tileRow, tileNumber) {
 	this.belongsTo = room || null;
 
 	/**
-	 * @property {array} entities - An array that holds all entities on this tile
+	 * @property {Array} entities - An array that holds all entities on this tile
 	 */
 	this.entities = [];
 
 	/**
-	 * @property {bool} staticObject - A static object that is on this tile
+	 * @property {Boolean} staticObject - A static object that is on this tile
 	 */
 	this.blockLight = blockLight;
 
 	/**
-	 * @property {number} lightLevel - The brightness of the current tile
+	 * @property {Number} lightLevel - The brightness of the current tile
 	 */
 	this.lightLevel = 0;
 
 	/**
-	 * @property {bool} explored - Boolean if a tile has already been explorer by the player
+	 * @property {Boolean} explored - Boolean if a tile has already been explorer by the player
 	 */
 	this.explored = false;
 
@@ -2480,57 +2480,57 @@ Roguelike.Map = function(game) {
 	this.entities = null;
 
 	/**
-	 * @property {number} tilesX - The number of horizontal tiles on this map
+	 * @property {Number} tilesX - The number of horizontal tiles on this map
 	 */
 	this.tilesX = game.settings.tilesX;
 
 	/**
-	 * @property {number} tilesY - The number of vertical tiles on this map
+	 * @property {Number} tilesY - The number of vertical tiles on this map
 	 */
 	this.tilesY = game.settings.tilesY;
 
 	/**
-	 * @property {number} maxRooms - The maximum number of rooms allowed on this map
+	 * @property {Number} maxRooms - The maximum number of rooms allowed on this map
 	 */
 	this.maxRooms = game.settings.maxRooms;
 
 	/**
-	 * @property {array} rooms - An array that holds all room objects
+	 * @property {Array} rooms - An array that holds all room objects
 	 */
 	this.rooms = [];
 
 	/**
-	 * @property {array} tiles - An array that holds all tile objects
+	 * @property {Array} tiles - An array that holds all tile objects
 	 */
 	this.tiles = [];
 
 	/**
-	 * @property {array} objects - An array that holds all objects that are on the map
+	 * @property {Array} objects - An array that holds all objects that are on the map
 	 */
 	this.objects = [];
 
 	/**
-	 * @property {number} tileSize - The width and height of a single tile on the map
+	 * @property {Number} tileSize - The width and height of a single tile on the map
 	 */
 	this.tileSize = game.settings.tileSize;
 
 	/**
-	 * @property {number} minRoomWidth - The minimum width of a room on this map
+	 * @property {Number} minRoomWidth - The minimum width of a room on this map
 	 */
 	this.minRoomWidth = game.settings.minRoomWidth;
 
 	/**
-	 * @property {number} maxRoomWidth - The maximum width of a room on this map
+	 * @property {Number} maxRoomWidth - The maximum width of a room on this map
 	 */
 	this.maxRoomWidth = game.settings.maxRoomWidth;
 
 	/**
-	 * @property {number} minRoomHeight - The minimum heigth of a room on this map
+	 * @property {Number} minRoomHeight - The minimum heigth of a room on this map
 	 */
 	this.minRoomHeight = game.settings.minRoomHeight;
 
 	/**
-	 * @property {number} maxRoomHeight - The maximum heigth of a room on this map
+	 * @property {Number} maxRoomHeight - The maximum heigth of a room on this map
 	 */
 	this.maxRoomHeight = game.settings.maxRoomHeight;
 
@@ -2678,7 +2678,7 @@ Roguelike.MapFactory = function(game) {
 	this.game = game;
 
 	/**
-	 * @property {array} possibleDoorLocations - Stores all the positions of possible door locations
+	 * @property {Array} possibleDoorLocations - Stores all the positions of possible door locations
 	 */
 	this.possibleDoorLocations = [];
 
@@ -2782,8 +2782,8 @@ Roguelike.MapFactory.prototype = {
 	 * Check in which direction the corridor has to be generated
 	 * @protected
 	 *
-	 * @param {object} firstRoom - The room from which we are going to generate a path to the second room
-	 * @param {object} secondRoom - This room is going to be the endpoint of this corridor
+	 * @param {Object} firstRoom - The room from which we are going to generate a path to the second room
+	 * @param {Object} secondRoom - This room is going to be the endpoint of this corridor
 	 */
 	generateCorridor: function(firstRoom, secondRoom) {
 
@@ -2839,8 +2839,8 @@ Roguelike.MapFactory.prototype = {
 	 * Generate a horizontal corridor tile, and also place doors and walls
 	 * @protected
 	 *
-	 * @param {number} x - The horizontal position of the tile that has to become a corridor
-	 * @param {number} y - The vertical position of the tile that has to become a corridor
+	 * @param {Number} x - The horizontal position of the tile that has to become a corridor
+	 * @param {Number} y - The vertical position of the tile that has to become a corridor
 	 */
 	generateHorizontalCorridor: function(x, y) {
 
@@ -2888,8 +2888,8 @@ Roguelike.MapFactory.prototype = {
 	 * Generate a vertical corridor tile, and also place walls
 	 * @protected
 	 *
-	 * @param {number} x - The horizontal position of the tile that has to become a corridor
-	 * @param {number} y - The vertical position of the tile that has to become a corridor
+	 * @param {Number} x - The horizontal position of the tile that has to become a corridor
+	 * @param {Number} y - The vertical position of the tile that has to become a corridor
 	 */
 	generateVerticalCorridor: function(x, y) {
 
@@ -3211,42 +3211,42 @@ Roguelike.MapFactory.prototype = {
 Roguelike.Room = function(x, y, w, h) {
 
 	/**
-	 * @property {number} x1 - The X position of the top left corner of this room
+	 * @property {Number} x1 - The X position of the top left corner of this room
 	 */
 	this.x1 = x;
 
 	/**
-	 * @property {number} x2 - The X position of the top right corner of this room
+	 * @property {Number} x2 - The X position of the top right corner of this room
 	 */
 	this.x2 = w + x;
 
 	/**
-	 * @property {number} y1 - The Y position of top left corner of this room
+	 * @property {Number} y1 - The Y position of top left corner of this room
 	 */
 	this.y1 = y;
 
 	/**
-	 * @property {number} y2 - The Y position of bottom left corner of this room
+	 * @property {Number} y2 - The Y position of bottom left corner of this room
 	 */
 	this.y2 = y + h;
 
 	/**
-	 * @property {number} w - The width of this room, defined in tiles
+	 * @property {Number} w - The width of this room, defined in tiles
 	 */
 	this.w = w;
 
 	/**
-	 * @property {number} h - The height of this room, defined in tiles
+	 * @property {Number} h - The height of this room, defined in tiles
 	 */
 	this.h = h;
 
 	/**
-	 * @property {array} layout - The array that contains the layout of this room
+	 * @property {Array} layout - The array that contains the layout of this room
 	 */
 	this.layout = [];
 
 	/**
-	 * @property {object} exit - An object that holds the exit coordinates of this room
+	 * @property {Object} exit - An object that holds the exit coordinates of this room
 	 */
 	this.exit = null;
 
