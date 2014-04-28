@@ -33,7 +33,7 @@ module.exports = function(grunt) {
 					"lib/gameobjects/components/position.js",
 					"lib/gameobjects/components/weapon.js",
 					"lib/gameobjects/components/canfight.js",
-					"lib/gameobjects/components/behaviour.js",
+					"lib/gameobjects/components/movement.js",
 					"lib/gameobjects/systems/render.js",
 					"lib/gameobjects/systems/open.js",
 					"lib/gameobjects/systems/lightmap.js",
