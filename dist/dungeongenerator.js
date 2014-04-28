@@ -744,7 +744,7 @@ Roguelike.Entity.prototype = {
 	 * Check whether this entity has a certain component
 	 * @protected
 	 *
-	 * @param {string} name - The name of the component
+	 * @param {String} name - The name of the component
 	 *
 	 * @return {Boolean} True when the entity has the component, false when it doesn't have the component
 	 */
@@ -758,7 +758,7 @@ Roguelike.Entity.prototype = {
 	 * Get a certain component on this entity
 	 * @protected
 	 *
-	 * @param {string} name - The name of the component
+	 * @param {String} name - The name of the component
 	 *
 	 * @return {Roguelike.Components} The component that this entity has
 	 */
@@ -912,12 +912,12 @@ Roguelike.Group.prototype = {
 Roguelike.Components.Sprite = function(sprite, row, tile) {
 
 	/**
-	 * @property {string} name - The name of this system. This field is always required!
+	 * @property {String} name - The name of this system. This field is always required!
 	 */
 	this.name = 'sprite';
 
 	/**
-	 * @property {string} sprite - The sprite image of this entity
+	 * @property {String} sprite - The sprite image of this entity
 	 */
 	this.sprite = sprite;
 
@@ -936,7 +936,7 @@ Roguelike.Components.Sprite = function(sprite, row, tile) {
 Roguelike.Components.Health = function(maxHealth) {
 
 	/**
-	 * @property {string} name - The name of this system. This field is always required!
+	 * @property {String} name - The name of this system. This field is always required!
 	 */
 	this.name = 'health';
 
@@ -978,7 +978,7 @@ Roguelike.Components.Health.prototype = {
 Roguelike.Components.CanOpen = function() {
 
 	/**
-	 * @property {string} name - The name of this system. This field is always required!
+	 * @property {String} name - The name of this system. This field is always required!
 	 */
 	this.name = 'canOpen';
 
@@ -988,7 +988,7 @@ Roguelike.Components.CanOpen = function() {
 	this.events = new Roguelike.Event();
 
 	/**
-	 * @property {string} state - The state of this door, closed opened etc
+	 * @property {String} state - The state of this door, closed opened etc
 	 */
 	this.state = 'closed';
 
@@ -1037,7 +1037,7 @@ Roguelike.Components.CanOpen.prototype = {
 Roguelike.Components.LightSource = function(gradient, radius) {
 
 	/**
-	 * @property {string} name - The name of this system. This field is always required!
+	 * @property {String} name - The name of this system. This field is always required!
 	 */
 	this.name = 'lightSource';
 
@@ -1056,7 +1056,7 @@ Roguelike.Components.LightSource = function(gradient, radius) {
 Roguelike.Components.Collide = function(collide) {
 
 	/**
-	 * @property {string} name - The name of this system. This field is always required!
+	 * @property {String} name - The name of this system. This field is always required!
 	 */
 	this.name = 'collide';
 
@@ -1070,7 +1070,7 @@ Roguelike.Components.Collide = function(collide) {
 Roguelike.Components.KeyboardControl = function(entity, game, controls) {
 
 	/**
-	 * @property {string} name - The name of this system. This field is always required!
+	 * @property {String} name - The name of this system. This field is always required!
 	 */
 	this.name = 'keyboardControl';
 
@@ -1191,7 +1191,7 @@ Roguelike.Components.KeyboardControl.prototype = {
 	 * The function that gets called when a player moves
 	 * @protected
 	 *
-	 * @param {string} direction - The direction the entities are being moved
+	 * @param {String} direction - The direction the entities are being moved
 	 */
 	newPosition: function(direction) {
 
@@ -1246,7 +1246,7 @@ Roguelike.Components.KeyboardControl.prototype = {
 Roguelike.Components.Position = function(position) {
 
 	/**
-	 * @property {string} name - The name of this system. This field is always required!
+	 * @property {String} name - The name of this system. This field is always required!
 	 */
 	this.name = 'position';
 
@@ -1260,7 +1260,7 @@ Roguelike.Components.Position = function(position) {
 Roguelike.Components.Weapon = function(damage) {
 
 	/**
-	 * @property {string} name - The name of this system. This field is always required!
+	 * @property {String} name - The name of this system. This field is always required!
 	 */
 	this.name = 'weapon';
 
@@ -1274,7 +1274,7 @@ Roguelike.Components.Weapon = function(damage) {
 Roguelike.Components.CanFight = function() {
 
 	/**
-	 * @property {string} name - The name of this system. This field is always required!
+	 * @property {String} name - The name of this system. This field is always required!
 	 */
 	this.name = 'canFight';
 
@@ -1324,7 +1324,7 @@ Roguelike.Components.CanFight.prototype = {
 Roguelike.Components.Movement = function(game, entity, func) {
 
 	/**
-	 * @property {string} name - The name of this system. This field is always required!
+	 * @property {String} name - The name of this system. This field is always required!
 	 */
 	this.name = 'movement';
 
