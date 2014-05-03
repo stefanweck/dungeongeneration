@@ -6,6 +6,7 @@ canvas{
 	margin:0 auto;
 	display:block;
 	margin-top:20px;
+    background-color:#000;
 }
 
 .hidden{
