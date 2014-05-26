@@ -25,7 +25,7 @@ You want to know what's on the other side of that wall? Go check it out, you don
 
 Currently this only applies to fellow programmers that know their way around the code. But in the future I will let people choose their own settings before they start their playthrough. Ensuring once again a new and fresh experience.
 
-# Demo
+## Demo
 
 You can view a live demo with the current code
 on GitHub right here: [Live Demo](http://htmlpreview.github.io/?https://github.com/stefanweck/dungeongeneration/blob/master/index.html).
@@ -106,7 +106,7 @@ Run `grunt` to perform a new build to the `dist` folder. This way every single s
 
 I would love for the community to help along with this project. It's already getting a decent sized game and chances are that I overlooked something or could improve something!
 
-- If you find an error or problem report it on [GitHub Issues][issues]!
+- If you find an error or problem report it on [GitHub Issues](issues)!
 
 - Feel free to fork the repository and propose a pull request!
 
@@ -115,6 +115,6 @@ I would love for the community to help along with this project. It's already get
 Do you have great ideas, do you want to contribute or just send 
 me an email. You can reach me by emailing to contact@stefanweck.nl!
 
-# License
+## License
 This project is licensed under the terms of the MIT license, 
-found in [LICENSE.md][LICENSE.md]
+found in [LICENSE.md](LICENSE.md)
