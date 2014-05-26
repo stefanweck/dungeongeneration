@@ -5,6 +5,8 @@ A roguelike game with a random dungeon generator that I am creating purely in ja
 
 ## Features
 
+![Some Characters](http://stefanweck.nl/github/github_banner_1.png)
+
 **Random Dungeon Generation**
 
 Every playthrough will be different because every single map is different! The map generator tries to create new maps that are worth exploring and that encourage you to clear the entire map.
@@ -26,6 +28,8 @@ You want to know what's on the other side of that wall? Go check it out, you don
 Currently this only applies to fellow programmers that know their way around the code. But in the future I will let people choose their own settings before they start their playthrough. Ensuring once again a new and fresh experience.
 
 ## Demo
+
+![Some Characters](http://stefanweck.nl/github/github_banner_2.png)
 
 You can view a live demo with the current code
 on GitHub right here: [Live Demo](http://htmlpreview.github.io/?https://github.com/stefanweck/dungeongeneration/blob/master/index.html).
