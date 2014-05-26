@@ -29,7 +29,7 @@ Currently this only applies to fellow programmers that know their way around the
 
 ## Demo
 
-![Some Characters](http://stefanweck.nl/github/github_banner_2.png)
+![Some Other Characters](http://stefanweck.nl/github/github_banner_2.png)
 
 You can view a live demo with the current code
 on GitHub right here: [Live Demo](http://htmlpreview.github.io/?https://github.com/stefanweck/dungeongeneration/blob/master/index.html).
@@ -115,6 +115,8 @@ I would love for the community to help along with this project. It's already get
 - Feel free to fork the repository and propose a pull request!
 
 ## Contact
+
+![Some More Characters](http://stefanweck.nl/github/github_banner_3.png)
 
 Do you have great ideas, do you want to contribute or just send 
 me an email. You can reach me by emailing to contact@stefanweck.nl!
