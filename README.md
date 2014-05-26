@@ -9,6 +9,7 @@ By [Stefan Weck](http://www.stefanweck.nl),
 
 - Keep track of the progress on the [Development Blog](http://gamesby.stefanweck.nl/)
 - Follow me on [Twitter](https://twitter.com/stefanweck)
+- Email me at contact@stefanweck.nl
 
 ## Features
 
