@@ -106,7 +106,7 @@ Run `grunt` to perform a new build to the `dist` folder. This way every single s
 
 I would love for the community to help along with this project. It's already getting a decent sized game and chances are that I overlooked something or could improve something!
 
-- If you find an error or problem report it on [GitHub Issues](issues)!
+- If you find an error or problem report it on [GitHub Issues](https://github.com/stefanweck/dungeongeneration/issues)!
 
 - Feel free to fork the repository and propose a pull request!
 
