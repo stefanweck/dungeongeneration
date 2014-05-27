@@ -1,7 +1,7 @@
 {
 	"title": "Dungeon Generator",
 	"name": "dungeongenerator",
-	"version": "1.8.0",
+	"version": "0.6.3",
 	"author": "Stefan Weck",
 	"homepage": "https://github.com/stefanweck/dungeongeneration",
 	"engines": {

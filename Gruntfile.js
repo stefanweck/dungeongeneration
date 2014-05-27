@@ -18,7 +18,6 @@ module.exports = function(grunt) {
 			dist: {
 				src: ["lib/roguelike.js",
 					"lib/core/game.js",
-					"lib/core/utils.js",
 					"lib/core/camera.js",
 					"lib/geometry/vector2.js",
 					"lib/geometry/boundary.js",
@@ -40,6 +39,7 @@ module.exports = function(grunt) {
 					"lib/gameobjects/systems/movement.js",
 					"lib/gameobjects/systems/combat.js",
 					"lib/gameobjects/systems/pathfinding.js",
+					"lib/gameobjects/behaviours/moveBehaviours.js",
 					"lib/factories/playerfactory.js",
 					"lib/factories/enemyfactory.js",
 					"lib/factories/propfactory.js",
@@ -47,11 +47,16 @@ module.exports = function(grunt) {
 					"lib/input/event.js",
 					"lib/input/key.js",
 					"lib/input/keyboard.js",
+					"lib/time/queue.js",
+					"lib/time/scheduler.js",
 					"lib/tilemap/tile.js",
 					"lib/tilemap/map.js",
 					"lib/tilemap/mapfactory.js",
+					"lib/tilemap/mapdecorator.js",
 					"lib/tilemap/room.js",
 					"lib/libraries/easystar.js",
+					"lib/libraries/mersennetwister.js",
+					"lib/core/utils.js",
 					"lib/init.js"
 				],
 				dest: 'dist/<%= pkg.name %>.js'
