@@ -191,10 +191,8 @@ Roguelike.Game.prototype = {
 	 */
 	update: function() {
 
-		var _this = this;
-		requestAnimationFrame(function() {
-			_this.update()
-		});
+		//Request a new animation frame and call the update function again
+		requestAnimationFrame.call(this, this.update());
 
 		//While the scheduler is locked, continue ticking
 		while(!this.scheduler.lockCount) {
