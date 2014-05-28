@@ -40,10 +40,8 @@ Currently this only applies to fellow programmers that know their way around the
 ![Some Other Characters](http://stefanweck.nl/github/github_banner_2.png)
 
 You can view a live demo with the current code
-on GitHub right here: [Live Demo](http://htmlpreview.github.io/?https://github.com/stefanweck/dungeongeneration/blob/master/index.html).
+on GitHub right here: [Live Demo](http://stefanweck.nl/github/dungeongeneration/).
 Note: Move the character around with your arrow keys!
-
-The page can load kind of slow, this is because it fetches every file from GitHub before displaying the game to you!
 
 ## What's Next
 
