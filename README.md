@@ -41,7 +41,7 @@ Currently this only applies to fellow programmers that know their way around the
 
 You can view a live demo with the current code
 on GitHub right here: [Live Demo](http://stefanweck.nl/github/dungeongeneration/).
-Note: Move the character around with your arrow keys!
+Note: Move the character around with your WASD keys!
 
 ## What's Next
 
