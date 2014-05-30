@@ -1,4 +1,4 @@
-/*! Dungeon Generator - v0.6.3 - 2014-05-26
+/*! Dungeon Generator - v0.6.3 - 2014-05-30
 * https://github.com/stefanweck/dungeongeneration
 * Copyright (c) 2014 Stefan Weck */
 /**
@@ -137,10 +137,10 @@ Roguelike.Game.prototype = {
 
 		//Associative array with every control that this entity uses
 		var playerControls = {};
-		playerControls["left"] = 37;
-		playerControls["right"] = 39;
-		playerControls["up"] = 38;
-		playerControls["down"] = 40;
+		playerControls["left"] = 65;
+		playerControls["right"] = 68;
+		playerControls["up"] = 87;
+		playerControls["down"] = 83;
 
 		//Create the player entity
 		this.player = Roguelike.PlayerFactory.newPlayerWarrior(this, playerPosition, playerControls);
@@ -192,7 +192,7 @@ Roguelike.Game.prototype = {
 	update: function() {
 
 		//Request a new animation frame and call the update function again
-		requestAnimationFrame.call(this, this.update());
+		requestAnimationFrame(this.update.bind(this));
 
 		//While the scheduler is locked, continue ticking
 		while(!this.scheduler.lockCount) {
@@ -542,10 +542,10 @@ Roguelike.Boundary.prototype = {
 
 		return(
 			boundary.left <= this.left &&
-				boundary.right >= this.right &&
-				boundary.top <= this.top &&
-				boundary.bottom >= this.bottom
-			);
+			boundary.right >= this.right &&
+			boundary.top <= this.top &&
+			boundary.bottom >= this.bottom
+		);
 
 	},
 
@@ -1036,71 +1036,48 @@ Roguelike.Components.KeyboardControl.prototype = {
 	 */
 	initialize: function() {
 
-		//Make sure the function inside the event listener can reach the scheduler
-		var _this = this;
-
 		//Loop through each control keycode of this entity
-		for(var key in _this.controls) {
+		for(var key in this.controls) {
 
 			switch(key) {
 
 				case("left"):
 
 					//Add up key and tell it to move the entities up when it hits
-					var leftKey = this.keyboard.getKey(_this.controls[key]);
+					var leftKey = this.keyboard.getKey(this.controls[key]);
 
-					//Function to perform
-					var moveLeft = function() {
-						_this.newPosition("left");
-					};
-
-					//Attach the function to the keydown event
-					leftKey.onDown.on(_this.controls[key], moveLeft, _this);
+					//Attach the new position function to the keydown event
+					leftKey.onDown.on(this.controls[key], this.newPosition.bind(this, "left"), this);
 
 					break;
 
 				case("right"):
 
 					//Add up key and tell it to move the entities up when it hits
-					var rightKey = this.keyboard.getKey(_this.controls[key]);
+					var rightKey = this.keyboard.getKey(this.controls[key]);
 
-					//Function to perform
-					var moveRight = function() {
-						_this.newPosition("right");
-					};
-
-					//Attach the function to the keydown event
-					rightKey.onDown.on(_this.controls[key], moveRight, _this);
+					//Attach the new position function to the keydown event
+					rightKey.onDown.on(this.controls[key], this.newPosition.bind(this, "right"), this);
 
 					break;
 
 				case("up"):
 
 					//Add up key and tell it to move the entities up when it hits
-					var upKey = this.keyboard.getKey(_this.controls[key]);
+					var upKey = this.keyboard.getKey(this.controls[key]);
 
-					//Function to perform
-					var moveUp = function() {
-						_this.newPosition("up");
-					};
-
-					//Attach the function to the keydown event
-					upKey.onDown.on(_this.controls[key], moveUp, _this);
+					//Attach the new position function to the keydown event
+					upKey.onDown.on(this.controls[key], this.newPosition.bind(this, "up"), this);
 
 					break;
 
 				case("down"):
 
 					//Add up key and tell it to move the entities up when it hits
-					var downKey = this.keyboard.getKey(_this.controls[key]);
+					var downKey = this.keyboard.getKey(this.controls[key]);
 
-					//Function to perform
-					var moveDown = function() {
-						_this.newPosition("down");
-					};
-
-					//Attach the function to the keydown event
-					downKey.onDown.on(_this.controls[key], moveDown, _this);
+					//Attach the new position function to the keydown event
+					downKey.onDown.on(this.controls[key], this.newPosition.bind(this, "down"), this);
 
 					break;
 
@@ -1295,14 +1272,14 @@ Roguelike.Systems.Render = function(game) {
 	this.canvas = null;
 
 	/**
-	 * @property {Object} canvas - The 2D context of the current canvas object
+	 * @property {Object} context - The 2D context of the current canvas object
 	 */
 	this.context = null;
 
 	/**
-	 * @property {Array} tileColors - Contains all the default colors for the tiles
+	 * @property {Object} mousePos - Object with x and y coordinate of the cursor on the canvas
 	 */
-	this.tileColors = ['#302222', '#443939', '#6B5B45'];
+	this.mousePos = null;
 
 	//Initialize itself
 	this.initialize();
@@ -1323,6 +1300,9 @@ Roguelike.Systems.Render.prototype = {
 
 		//Define the context to draw on
 		this.context = this.game.settings.canvas.getContext("2d");
+
+		//Add the mouse move event listener to the canvas to always have the mouse position stored
+		this.canvas.addEventListener("mousemove", this.getMousePointer.bind(this));
 
 		//Disable image smoothing with some very ugly browser specific code
 		//TODO: Check again in 10 years if there are better solutions to this
@@ -1366,6 +1346,9 @@ Roguelike.Systems.Render.prototype = {
 
 		//Draw the lightmap
 		this.drawLightMap();
+
+		//Draw the UI
+		this.drawUI();
 
 	},
 
@@ -1521,6 +1504,174 @@ Roguelike.Systems.Render.prototype = {
 	},
 
 	/**
+	 * Draw the UI on top of everything
+	 * @protected
+	 */
+	drawUI: function() {
+
+		//Define variables
+		var map = this.game.map;
+		var camera = this.game.camera;
+
+		//TODO: Use a preloader and only get the file once, not every frame T__T
+		var img = document.getElementById("ui");
+
+		//If the mouse position isn't set, stop right here
+		if(this.mousePos === null){
+			return;
+		}
+
+		//Calculate the offset of the camera, how many pixels are left at the left and top of the screen
+		var cameraXOffset = camera.position.x % map.settings.tileSize;
+		var cameraYOffset = camera.position.y % map.settings.tileSize;
+
+		//Calculate at which tile the mouse is currently pointing relative to the camera
+		var tileXRel = Math.floor((this.mousePos.x + cameraXOffset) / map.settings.tileSize);
+		var tileYRel = Math.floor((this.mousePos.y + cameraYOffset) / map.settings.tileSize);
+
+		//Calculate at which tile the mouse is currently pointing absolute to the camera
+		var tileXAbs = Math.floor((this.mousePos.x + camera.position.x) / map.settings.tileSize);
+		var tileYAbs = Math.floor((this.mousePos.y + camera.position.y) / map.settings.tileSize);
+
+		//Create a new Vector2 object of the tile's position
+		var tilePosition = new Roguelike.Vector2(tileXAbs, tileYAbs);
+
+		//If the tile that the mouse is pointing at is not within the map, quit here
+		if(!map.insideBounds(tilePosition)){
+			return;
+		}
+
+		//Get the tile at the mouse position
+		var tile = map.getTileAt(tilePosition);
+
+		//If the tile isn't a floor tile, you can't walk there so why bother showing the mouse pointer
+		//Also don't show the mouse pointer if you haven't explored the tile yet
+		if(tile.type !== 2 || !tile.explored){
+			return;
+		}
+
+		//Draw the sprite of the mouse pointer on the canvas
+		this.context.drawImage(
+			img,
+			0,
+			0,
+			16,
+			16,
+			tileXRel * map.settings.tileSize - cameraXOffset,
+			tileYRel * map.settings.tileSize - cameraYOffset,
+			map.settings.tileSize,
+			map.settings.tileSize
+		);
+
+		//Check if there are entities at the tile
+		if(tile.entities.length === 0){
+			return;
+		}
+
+		//Get the lats entity
+		var lastEntity = tile.entities[tile.entities.length - 1];
+
+		if(lastEntity.hasComponent("tooltip")){
+
+			//Get the components
+			var tooltipComponent = lastEntity.getComponent("tooltip");
+
+			//Determine what the lineHeight is
+			var lineHeight = (tooltipComponent.fontSize + 5);
+
+			//Draw a rectangle underneath the text
+			this.context.fillStyle = "rgba(0, 0, 0, 0.7)";
+
+			//Create a rectangle!
+			this.context.fillRect(
+				//Get the current position of the tile, and check where it is in the camera's viewport
+				this.mousePos.x + 5,
+				this.mousePos.y + 10,
+				tooltipComponent.maxWidth + 20,
+				lineHeight * (tooltipComponent.title.length + tooltipComponent.type.length + tooltipComponent.description.length) + 20
+			);
+
+			//Start by drawing on line number 0, this value will get incremented every new line
+			var currentPos = 0;
+
+			//Draw the tooltips title
+			for(var t = 0; t < tooltipComponent.title.length; t++){
+
+				this.context.font = "bold "+tooltipComponent.fontSize + "px "+tooltipComponent.font;
+				this.context.fillStyle = "rgba(255, 255, 255, 1)";
+
+				//Draw the title on screen
+				this.context.fillText(
+					tooltipComponent.title[t],
+					this.mousePos.x + 15,
+					this.mousePos.y + 15 + lineHeight + (lineHeight * currentPos)
+				);
+
+				//Continue drawing on the next line
+				currentPos++;
+
+			}
+
+			//Draw the tooltips type
+			for(var y = 0; y < tooltipComponent.type.length; y++){
+
+				this.context.font = tooltipComponent.fontSize + "px "+tooltipComponent.font;
+				this.context.fillStyle = "rgba(255, 255, 200, 1)";
+
+				//Draw the title on screen
+				this.context.fillText(
+					tooltipComponent.type[y],
+					this.mousePos.x + 15,
+					this.mousePos.y + 15 + lineHeight + (lineHeight * currentPos)
+				);
+
+				//Continue drawing on the next line
+				currentPos++;
+
+			}
+
+			//Draw the tooltips description
+			for(var i = 0; i < tooltipComponent.description.length; i++){
+
+				//Set the current fontsize to the context of the canvas
+				this.context.font = tooltipComponent.fontSize + "px "+tooltipComponent.font;
+				this.context.fillStyle = "rgba(180, 180, 180, 1)";
+
+				//Draw the description on screen
+				this.context.fillText(
+					tooltipComponent.description[i],
+					this.mousePos.x + 15,
+					this.mousePos.y + 15 + lineHeight + (lineHeight * currentPos)
+				);
+
+				//Continue drawing on the next line
+				currentPos++;
+
+			}
+
+
+		}
+
+	},
+
+	/**
+	 * Get the position of the mouse on the canvas and store it for later use
+	 * @protected
+	 */
+	getMousePointer: function(event) {
+
+		//Get the rectangle from the canvas
+		var rect = this.canvas.getBoundingClientRect();
+
+		//Calculate the mouse position
+		this.mousePos = {
+			x: event.clientX - rect.left,
+			y: event.clientY - rect.top
+		};
+
+	},
+
+	/**
 	 * Function to clear the canvas
 	 * @protected
 	 */
@@ -1557,6 +1708,7 @@ Roguelike.Systems.Open.prototype = {
 		var spriteComponent = entity.getComponent("sprite");
 		var positionComponent = entity.getComponent("position");
 		var collideComponent = entity.getComponent("collide");
+		var tooltipComponent = entity.getComponent("tooltip");
 
 		//Action to open the door
 		if(canOpenComponent.state !== "open") {
@@ -1569,6 +1721,8 @@ Roguelike.Systems.Open.prototype = {
 
 			//Make sure the collide component doesn't say it collides anymore
 			collideComponent.collide = false;
+
+			tooltipComponent.type = ["Open"];
 
 			//Make sure the tile that this openable entity is on doesn't block light anymore
 			this.game.map.tiles[positionComponent.position.x][positionComponent.position.y].blockLight = false;
@@ -1888,6 +2042,15 @@ Roguelike.Systems.Movement.prototype = {
 				//Loop through the components
 				for(var key in nextTile.entities[i].components) {
 
+					//Check if the entity still exists
+					if(typeof nextTile.entities[i] === "undefined"){
+
+						//The entity could have died in a previous bumpInto event
+						//Thus we should abort the loop of the entity no longer exists
+						break;
+
+					}
+
 					//Check if the component has an events parameter
 					if(typeof nextTile.entities[i].components[key].events !== "undefined") {
 
@@ -1987,7 +2150,6 @@ Roguelike.Systems.Combat.prototype = {
 		//Remove the entity from the tile it was standing on
 		currentTile.removeEntity(entity);
 
-
 	}
 
 };
@@ -2027,9 +2189,6 @@ Roguelike.Systems.PathFinding.prototype = {
 		//TODO: Enable diagonal movement and make sure the player can also move diagonal
 		this.easystar.disableDiagonals();
 
-		//Set the acceptable tiles to walk on
-		this.easystar.setAcceptableTiles([2]);
-
 
 	},
 
@@ -2038,8 +2197,12 @@ Roguelike.Systems.PathFinding.prototype = {
 	 * @protected
 	 *
 	 * @param {Roguelike.Entity} entity - The entity that is being processed by this system
+	 * @param {Array} acceptableTiles - The entity is able to walk on the tiles in this array
 	 */
-	handleSingleEntity: function(entity) {
+	handleSingleEntity: function(entity, acceptableTiles) {
+
+		//Set the acceptable tiles to walk on
+		this.easystar.setAcceptableTiles(acceptableTiles);
 
 		//Get the components from the current entity and store them temporarily in a variable
 		var positionComponent = entity.getComponent("position");
@@ -2112,8 +2275,11 @@ Roguelike.moveBehaviours = {
 
 		return function(game, entity) {
 
+			//Array with all the acceptable/walkable tiles for this move behaviour
+			var acceptableTiles = [2];
+
 			//Make a call to the pathfinding system
-			game.staticSystems.pathfindingSystem.handleSingleEntity(entity);
+			game.staticSystems.pathfindingSystem.handleSingleEntity(entity, acceptableTiles);
 
 		};
 
@@ -2127,9 +2293,13 @@ Roguelike.moveBehaviours = {
 	 */
 	flyBehaviour: function() {
 
-		return function() {
+		return function(game, entity) {
 
-			console.log("I'm flying!");
+			//Array with all the acceptable/walkable tiles for this move behaviour
+			var acceptableTiles = [2];
+
+			//Make a call to the pathfinding system
+			game.staticSystems.pathfindingSystem.handleSingleEntity(entity, acceptableTiles);
 
 		};
 
@@ -2183,6 +2353,9 @@ Roguelike.PlayerFactory = {
 		//This entity is capable of fighting
 		entity.addComponent(new Roguelike.Components.CanFight(game));
 
+		//Add a tooltip to this entity
+		entity.addComponent(new Roguelike.Components.Tooltip(game.settings.canvas, "Player", "", ""));
+
 		//Return the entity
 		return entity;
 
@@ -2232,6 +2405,9 @@ Roguelike.EnemyFactory = {
 		//This entity is capable of fighting
 		entity.addComponent(new Roguelike.Components.CanFight(game));
 
+		//Add a tooltip to this entity
+		entity.addComponent(new Roguelike.Components.Tooltip(game.settings.canvas, "Quick Spider", "Arachnid Enemy", "The quick spider is twice as fast as you and will definitely attack you. It's just programmed to do so."));
+
 		//Return the entity
 		return entity;
 
@@ -2276,6 +2452,9 @@ Roguelike.EnemyFactory = {
 
 		//This entity is capable of fighting
 		entity.addComponent(new Roguelike.Components.CanFight(game));
+
+		//Add a tooltip to this entity
+		entity.addComponent(new Roguelike.Components.Tooltip(game.settings.canvas, "Skeleton", "Undead Enemy", "The skeleton is a very dangerous but unstable enemy. If you stab just right his bones will collapse."));
 
 		//Return the entity
 		return entity;
@@ -2361,6 +2540,9 @@ Roguelike.PropFactory = {
 
 		//You can collide with this entity
 		entity.addComponent(new Roguelike.Components.Collide(true));
+
+		//Add a tooltip to this entity
+		entity.addComponent(new Roguelike.Components.Tooltip(game.settings.canvas, "Wooden Door", "Closed", ""));
 
 		//Return the entity
 		return entity;
@@ -2597,22 +2779,19 @@ Roguelike.Keyboard.prototype = {
 	 */
 	initialize: function() {
 
-		//Set the scope of this to _this
-		var _this = this;
-
 		//The onKeyDown event of the document is the following function:
 		this._onKeyDown = function(event) {
-			return _this.processKeyDown(event);
+			return this.processKeyDown(event);
 		};
 
 		//The onKeyUp event of the document is the following function:
 		this._onKeyUp = function(event) {
-			return _this.processKeyUp(event);
+			return this.processKeyUp(event);
 		};
 
 		//Add the event listeners to the window
-		window.addEventListener('keydown', this._onKeyDown, false);
-		window.addEventListener('keyup', this._onKeyUp, false);
+		window.addEventListener('keydown', this._onKeyDown.bind(this), false);
+		window.addEventListener('keyup', this._onKeyUp.bind(this), false);
 
 	},
 
@@ -3018,6 +3197,8 @@ Roguelike.Scheduler.prototype = {
 
 		//We can let the entity act
 		entity.act();
+
+		//We managed to act, so we return true
 		return true;
 
 	},
@@ -3283,6 +3464,25 @@ Roguelike.Map.prototype = {
 			return new Roguelike.Tile();
 
 		}
+
+	},
+
+	/**
+	 * Function to check if one position is inside the maps boundary
+	 * @protected
+	 *
+	 * @param {Roguelike.Vector2} position - The position that is being requested
+	 *
+	 * @return {Boolean} Returns true if the position is within this map, returns false if it isn't
+	 */
+	insideBounds: function(position){
+
+		return(
+			position.x > 0 &&
+			position.x < this.settings.tilesX &&
+			position.y > 0 &&
+			position.y < this.settings.tilesY
+		);
 
 	},
 
