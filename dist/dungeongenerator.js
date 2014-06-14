@@ -1,4 +1,4 @@
-/*! Dungeon Generator - v0.6.3 - 2014-05-30
+/*! Dungeon Generator - v0.6.3 - 2014-06-14
 * https://github.com/stefanweck/dungeongeneration
 * Copyright (c) 2014 Stefan Weck */
 /**
@@ -310,28 +310,30 @@ Roguelike.Camera.prototype = {
 			var tileSize = this.game.map.settings.tileSize;
 
 			//Move the camera horizontal first
+			//We Math.floor the final position so the position is always a rounded number. This prevents the pixel scaling from trying to enlarge half pixels and thus providing weird graphics.
 			if((this.followObject.position.x * tileSize) - this.position.x + this.minimumDistanceX > this.viewportWidth) {
 
 				//Set the new horizontal position for the camera
-				this.position.x = (this.followObject.position.x * tileSize) - (this.viewportWidth - this.minimumDistanceX);
+				this.position.x = Math.floor((this.followObject.position.x * tileSize) - (this.viewportWidth - this.minimumDistanceX));
 
 			}else if((this.followObject.position.x * tileSize) - this.minimumDistanceX < this.position.x) {
 
 				//Set the new horizontal position for the camera
-				this.position.x = (this.followObject.position.x * tileSize) - this.minimumDistanceX;
+				this.position.x = Math.floor((this.followObject.position.x * tileSize) - this.minimumDistanceX);
 
 			}
 
 			//Then move the camera vertical
+			//We Math.floor the final position so the position is always a rounded number. This prevents the pixel scaling from trying to enlarge half pixels and thus providing weird graphics.
 			if((this.followObject.position.y * tileSize) - this.position.y + this.minimumDistanceY > this.viewportHeight) {
 
 				//Set the new vertical position for the camera
-				this.position.y = (this.followObject.position.y * tileSize) - (this.viewportHeight - this.minimumDistanceY);
+				this.position.y = Math.floor((this.followObject.position.y * tileSize) - (this.viewportHeight - this.minimumDistanceY));
 
 			}else if((this.followObject.position.y * tileSize) - this.minimumDistanceY < this.position.y) {
 
 				//Set the new vertical position for the camera
-				this.position.y = (this.followObject.position.y * tileSize) - this.minimumDistanceY;
+				this.position.y = Math.floor((this.followObject.position.y * tileSize) - this.minimumDistanceY);
 
 			}
 
@@ -542,10 +544,10 @@ Roguelike.Boundary.prototype = {
 
 		return(
 			boundary.left <= this.left &&
-			boundary.right >= this.right &&
-			boundary.top <= this.top &&
-			boundary.bottom >= this.bottom
-		);
+				boundary.right >= this.right &&
+				boundary.top <= this.top &&
+				boundary.bottom >= this.bottom
+			);
 
 	},
 
@@ -806,7 +808,7 @@ Roguelike.Group.prototype = {
 
 };
 
-Roguelike.Components.Sprite = function(sprite, row, tile) {
+Roguelike.Components.Sprite = function(sprite, row, tile, offset) {
 
 	/**
 	 * @property {String} name - The name of this system. This field is always required!
@@ -828,7 +830,50 @@ Roguelike.Components.Sprite = function(sprite, row, tile) {
 	 */
 	this.tile = tile;
 
+	/**
+	 * @property {Object} offset - The horizontal and vertical offset of this sprite, used for example to render something a little above of below it's position
+	 */
+	this.offset = offset || {x: 0, y: 0};
+
+	/**
+	 * @property {String} direction - The direction this sprite is facing. Left, right, up, down.
+	 */
+	this.direction = "right";
+
 };
+
+Roguelike.Components.Sprite.prototype = {
+
+	/**
+	 * Return the tile that should be rendered, based on the direction
+	 * @protected
+	 *
+	 * @return {Number} Returns the tile number
+	 */
+	getTileNumber: function() {
+
+		//Switch between all possible directions
+		switch(this.direction) {
+
+			default:
+			case("right"):
+
+				return this.tile;
+
+				break;
+
+			case("left"):
+
+				return this.tile + 1;
+
+				break;
+
+		}
+
+	}
+
+};
+
 
 Roguelike.Components.Health = function(maxHealth) {
 
@@ -836,6 +881,11 @@ Roguelike.Components.Health = function(maxHealth) {
 	 * @property {String} name - The name of this system. This field is always required!
 	 */
 	this.name = 'health';
+
+	/**
+	 * @property {Number} minHealth - The minimum health of the entity
+	 */
+	this.minHealth = 0;
 
 	/**
 	 * @property {Number} health - The starting, and maximum health of the entity
@@ -881,7 +931,7 @@ Roguelike.Components.Health.prototype = {
 	isDead: function() {
 
 		//Return true or false based on the entities health
-		return this.health <= 0;
+		return this.health <= this.minHealth;
 
 	},
 
@@ -893,6 +943,13 @@ Roguelike.Components.Health.prototype = {
 
 		//Subtract the damage from the health of this entity
 		this.health -= damage;
+
+		//If the health drops below the minimum health, set it to the minimum health
+		if(this.health < this.minHealth) {
+
+			this.health = this.minHealth;
+
+		}
 
 	}
 
@@ -1365,21 +1422,21 @@ Roguelike.Systems.Render.prototype = {
 		var camera = this.game.camera;
 
 		//Get the components from the current entity and store them temporarily in a variable
-		var renderComponent = entity.getComponent("sprite");
+		var spriteComponent = entity.getComponent("sprite");
 		var positionComponent = entity.getComponent("position");
 
 		//TODO: Use a preloader and only get the file once, not every frame T__T
-		var img = document.getElementById(renderComponent.sprite);
+		var img = document.getElementById(spriteComponent.sprite);
 
 		//Draw the sprite of this entity on the canvas
 		this.context.drawImage(
 			img,
-			renderComponent.tile * 16,
-			renderComponent.row * 16,
+			spriteComponent.getTileNumber() * 16,
+			spriteComponent.row * 16,
 			16,
 			16,
-			(positionComponent.position.x * map.settings.tileSize) - camera.position.x,
-			(positionComponent.position.y * map.settings.tileSize) - camera.position.y,
+			(positionComponent.position.x * map.settings.tileSize) - camera.position.x + spriteComponent.offset.x,
+			(positionComponent.position.y * map.settings.tileSize) - camera.position.y + spriteComponent.offset.y,
 			map.settings.tileSize,
 			map.settings.tileSize
 		);
@@ -1396,9 +1453,9 @@ Roguelike.Systems.Render.prototype = {
 
 				//Create the object ( just a rectangle for now )!
 				this.context.fillRect(
-					(positionComponent.position.x * this.game.map.settings.tileSize) - this.game.camera.position.x,
-					(positionComponent.position.y * this.game.map.settings.tileSize) - this.game.camera.position.y,
-					this.game.map.settings.tileSize * healthComponent.percentage(),
+					(positionComponent.position.x * map.settings.tileSize) - camera.position.x,
+					(positionComponent.position.y * map.settings.tileSize) - camera.position.y,
+					map.settings.tileSize * healthComponent.percentage(),
 					5
 				);
 
@@ -1517,7 +1574,7 @@ Roguelike.Systems.Render.prototype = {
 		var img = document.getElementById("ui");
 
 		//If the mouse position isn't set, stop right here
-		if(this.mousePos === null){
+		if(this.mousePos === null) {
 			return;
 		}
 
@@ -1537,7 +1594,7 @@ Roguelike.Systems.Render.prototype = {
 		var tilePosition = new Roguelike.Vector2(tileXAbs, tileYAbs);
 
 		//If the tile that the mouse is pointing at is not within the map, quit here
-		if(!map.insideBounds(tilePosition)){
+		if(!map.insideBounds(tilePosition)) {
 			return;
 		}
 
@@ -1546,7 +1603,7 @@ Roguelike.Systems.Render.prototype = {
 
 		//If the tile isn't a floor tile, you can't walk there so why bother showing the mouse pointer
 		//Also don't show the mouse pointer if you haven't explored the tile yet
-		if(tile.type !== 2 || !tile.explored){
+		if(tile.type !== 2 || !tile.explored) {
 			return;
 		}
 
@@ -1564,14 +1621,14 @@ Roguelike.Systems.Render.prototype = {
 		);
 
 		//Check if there are entities at the tile
-		if(tile.entities.length === 0){
+		if(tile.entities.length === 0) {
 			return;
 		}
 
 		//Get the lats entity
 		var lastEntity = tile.entities[tile.entities.length - 1];
 
-		if(lastEntity.hasComponent("tooltip")){
+		if(lastEntity.hasComponent("tooltip")) {
 
 			//Get the components
 			var tooltipComponent = lastEntity.getComponent("tooltip");
@@ -1595,9 +1652,9 @@ Roguelike.Systems.Render.prototype = {
 			var currentPos = 0;
 
 			//Draw the tooltips title
-			for(var t = 0; t < tooltipComponent.title.length; t++){
+			for(var t = 0; t < tooltipComponent.title.length; t++) {
 
-				this.context.font = "bold "+tooltipComponent.fontSize + "px "+tooltipComponent.font;
+				this.context.font = "bold " + tooltipComponent.fontSize + "px " + tooltipComponent.font;
 				this.context.fillStyle = "rgba(255, 255, 255, 1)";
 
 				//Draw the title on screen
@@ -1613,9 +1670,9 @@ Roguelike.Systems.Render.prototype = {
 			}
 
 			//Draw the tooltips type
-			for(var y = 0; y < tooltipComponent.type.length; y++){
+			for(var y = 0; y < tooltipComponent.type.length; y++) {
 
-				this.context.font = tooltipComponent.fontSize + "px "+tooltipComponent.font;
+				this.context.font = tooltipComponent.fontSize + "px " + tooltipComponent.font;
 				this.context.fillStyle = "rgba(255, 255, 200, 1)";
 
 				//Draw the title on screen
@@ -1631,10 +1688,10 @@ Roguelike.Systems.Render.prototype = {
 			}
 
 			//Draw the tooltips description
-			for(var i = 0; i < tooltipComponent.description.length; i++){
+			for(var i = 0; i < tooltipComponent.description.length; i++) {
 
 				//Set the current fontsize to the context of the canvas
-				this.context.font = tooltipComponent.fontSize + "px "+tooltipComponent.font;
+				this.context.font = tooltipComponent.fontSize + "px " + tooltipComponent.font;
 				this.context.fillStyle = "rgba(180, 180, 180, 1)";
 
 				//Draw the description on screen
@@ -1971,11 +2028,18 @@ Roguelike.Systems.Movement.prototype = {
 	 */
 	handleSingleEntity: function(entity, newPosition) {
 
-		//Get components
-		var positionComponent = entity.getComponent("position");
+		//Check if the sprite needs to be flipped
+		if(entity.hasComponent("sprite")) {
+
+			this.changeDirection(entity, newPosition);
+
+		}
 
 		//Check if the new position is correct
 		if(this.canMove(entity, newPosition)) {
+
+			//Get components
+			var positionComponent = entity.getComponent("position");
 
 			//Get the tile to which the entity is trying to move
 			var currentTile = this.game.map.tiles[positionComponent.position.x][positionComponent.position.y];
@@ -1989,6 +2053,35 @@ Roguelike.Systems.Movement.prototype = {
 
 			//Pop the new position from the "stack"
 			positionComponent.position = newPosition;
+
+		}
+
+	},
+
+	/**
+	 * Changes the direction of a sprite based on it's new position
+	 * This way a sprite can face left or right based on it's movement
+	 * @protected
+	 *
+	 * @param {Roguelike.Entity} entity - The entity that is being processed by this system
+	 * @param {Object} newPosition - The new x or y coordinates the entity is trying to move to
+	 */
+	changeDirection: function(entity, newPosition) {
+
+		//Get components
+		var positionComponent = entity.getComponent("position");
+		var spriteComponent = entity.getComponent("sprite");
+
+		//Check if the entity moved left or right
+		if(newPosition.x > positionComponent.position.x) {
+
+			//The entity moved right
+			spriteComponent.direction = "right";
+
+		}else if(newPosition.x < positionComponent.position.x) {
+
+			//The entity moved left
+			spriteComponent.direction = "left";
 
 		}
 
@@ -2043,7 +2136,7 @@ Roguelike.Systems.Movement.prototype = {
 				for(var key in nextTile.entities[i].components) {
 
 					//Check if the entity still exists
-					if(typeof nextTile.entities[i] === "undefined"){
+					if(typeof nextTile.entities[i] === "undefined") {
 
 						//The entity could have died in a previous bumpInto event
 						//Thus we should abort the loop of the entity no longer exists
@@ -2219,9 +2312,6 @@ Roguelike.Systems.PathFinding.prototype = {
 				var player = this.game.player;
 				var playerPositionComponent = player.getComponent("position");
 
-				//Initialize variables
-				var _this = this;
-
 				//Tile at position
 				var tileAtPos = this.game.map.getTileAt(positionComponent.position);
 
@@ -2229,32 +2319,53 @@ Roguelike.Systems.PathFinding.prototype = {
 				if(tileAtPos.lightLevel > 0.7) {
 
 					//Let EasyStar calculate a path towards the player find a path
-					this.easystar.findPath(positionComponent.position.x, positionComponent.position.y, playerPositionComponent.position.x, playerPositionComponent.position.y, function(path) {
+					this.easystar.findPath(
 
-						//TODO: Make sure enemies don't kill eachother, they have to find another route or collaborate
-						if(path === null || path.length === 0) {
+						//Find a path from
+						positionComponent.position.x,
+						positionComponent.position.y,
 
-							console.log("no path found");
+						//Find a path to
+						playerPositionComponent.position.x,
+						playerPositionComponent.position.y,
 
-						}else{
+						//Callback function
+						this.findPathHandler.bind(this, entity)
 
-							//Create a new Vector2 object of the new position
-							var newPosition = new Roguelike.Vector2(path[1].x, path[1].y);
-
-							//Tell the movement system that you want to move to the new position
-							_this.game.staticSystems.movementSystem.handleSingleEntity(entity, newPosition);
-
-						}
-
-					});
+					);
 
 					//Calculate the path
 					this.easystar.calculate();
 
-
 				}
 
 				break;
+
+		}
+
+	},
+
+	/**
+	 * Function that handles the result of the EasyStar findPath function
+	 * @protected
+	 *
+	 * @param {Roguelike.Entity} entity - The entity that is being processed by this system
+	 * @param {Array} path - An array with in each position an object with the next position of the path
+	 */
+	findPathHandler: function(entity, path) {
+
+		//TODO: Make sure enemies don't kill eachother, they have to find another route or collaborate
+		if(path === null || path.length === 0) {
+
+			console.log("no path found");
+
+		}else{
+
+			//Create a new Vector2 object of the new position
+			var newPosition = new Roguelike.Vector2(path[1].x, path[1].y);
+
+			//Tell the movement system that you want to move to the new position
+			this.game.staticSystems.movementSystem.handleSingleEntity(entity, newPosition);
 
 		}
 
@@ -2406,7 +2517,12 @@ Roguelike.EnemyFactory = {
 		entity.addComponent(new Roguelike.Components.CanFight(game));
 
 		//Add a tooltip to this entity
-		entity.addComponent(new Roguelike.Components.Tooltip(game.settings.canvas, "Quick Spider", "Arachnid Enemy", "The quick spider is twice as fast as you and will definitely attack you. It's just programmed to do so."));
+		entity.addComponent(new Roguelike.Components.Tooltip(
+			game.settings.canvas,
+			"Quick Spider",
+			"Arachnid Enemy",
+			"The quick spider is twice as fast as you and will definitely attack you. It's just programmed to do so."
+		));
 
 		//Return the entity
 		return entity;
@@ -2454,7 +2570,12 @@ Roguelike.EnemyFactory = {
 		entity.addComponent(new Roguelike.Components.CanFight(game));
 
 		//Add a tooltip to this entity
-		entity.addComponent(new Roguelike.Components.Tooltip(game.settings.canvas, "Skeleton", "Undead Enemy", "The skeleton is a very dangerous but unstable enemy. If you stab just right his bones will collapse."));
+		entity.addComponent(new Roguelike.Components.Tooltip(
+			game.settings.canvas,
+			"Skeleton",
+			"Undead Enemy",
+			"The skeleton is a very dangerous but unstable enemy. If you stab just right his bones will collapse."
+		));
 
 		//Return the entity
 		return entity;
@@ -2533,7 +2654,7 @@ Roguelike.PropFactory = {
 		entity.addComponent(new Roguelike.Components.Position(position));
 
 		//The entity has a sprite ( color for now )
-		entity.addComponent(new Roguelike.Components.Sprite("tileset", 1, 0));
+		entity.addComponent(new Roguelike.Components.Sprite("tileset", 2, 2));
 
 		//This entity can be opened up by another entity
 		entity.addComponent(new Roguelike.Components.CanOpen(game, entity));
@@ -2583,7 +2704,7 @@ Roguelike.DecorationFactory = {
 Roguelike.Event = function() {
 
 	/**
-	 * @property {Object} events - An object with all the current events
+	 * @property {Object} events - An associative array with all the current events
 	 */
 	this.events = {};
 
@@ -2595,19 +2716,19 @@ Roguelike.Event.prototype = {
 	 * Function that handles keydown events
 	 * @protected
 	 *
-	 * @param {Object} event - The event object
+	 * @param {String} type - The type of event that can be triggered
 	 * @param {Function} callback - The function that has to be performed as a callback
 	 * @param {Object} context - The object that should be accessible when the event is called
 	 */
-	on: function(event, callback, context) {
+	on: function(type, callback, context) {
 
 		//If this.events doesn't have the event property, create an empty array
-		if(!this.events.hasOwnProperty(event)) {
-			this.events[event] = [];
+		if(!this.events.hasOwnProperty(type)) {
+			this.events[type] = [];
 		}
 
 		//Insert the callback into the current event
-		this.events[event].push([callback, context]);
+		this.events[type].push([callback, context]);
 
 	},
 
@@ -2615,16 +2736,16 @@ Roguelike.Event.prototype = {
 	 * Function that is called when an event is triggered
 	 * @protected
 	 *
-	 * @param {Object} event - The event object
+	 * @param {String} type - The type of event that is triggered
 	 */
-	trigger: function(event) {
+	trigger: function(type) {
 
 		//Because we don't know how many arguments are being send to
 		//the callbacks, let's get them all except the first one ( the tail )
 		var tail = Array.prototype.slice.call(arguments, 1);
 
 		//Get all the callbacks for the current event
-		var callbacks = this.events[event];
+		var callbacks = this.events[type];
 
 		//Check if there are callbacks defined for this key, if not, stop!
 		if(callbacks !== undefined) {
@@ -3449,13 +3570,13 @@ Roguelike.Map.prototype = {
 	 *
 	 * @return {Roguelike.Tile} The tile object that has been found, empty object otherwise
 	 */
-	getTileAt: function(position){
+	getTileAt: function(position) {
 
 		//Try to get the tile object from the map
 		var tile = this.tiles[position.x][position.y];
 
 		//Check if the tile object is something, else return an empty tile object
-		if(tile){
+		if(tile) {
 
 			return tile;
 
@@ -3475,14 +3596,14 @@ Roguelike.Map.prototype = {
 	 *
 	 * @return {Boolean} Returns true if the position is within this map, returns false if it isn't
 	 */
-	insideBounds: function(position){
+	insideBounds: function(position) {
 
 		return(
 			position.x > 0 &&
-			position.x < this.settings.tilesX &&
-			position.y > 0 &&
-			position.y < this.settings.tilesY
-		);
+				position.x < this.settings.tilesX &&
+				position.y > 0 &&
+				position.y < this.settings.tilesY
+			);
 
 	},
 
@@ -3630,7 +3751,7 @@ Roguelike.MapFactory.prototype = {
 		while(roomList.length < maxRooms) {
 
 			//If we are already at the maximum amount of tries, break the loop
-			if(tries >= maxTries){
+			if(tries >= maxTries) {
 				break;
 			}
 
@@ -3638,7 +3759,7 @@ Roguelike.MapFactory.prototype = {
 			var directions = ["left", "right", "up", "down"];
 
 			//Get the previous room
-			switch (type){
+			switch(type) {
 
 				//Generate a path of rooms, this means we have to generate a room from the previous room
 				case("path"):
@@ -3667,11 +3788,11 @@ Roguelike.MapFactory.prototype = {
 			}
 
 			//Continue until we break the loop ourselves
-			while(true){
+			while(true) {
 
 				//If there aren't any directions left to try, we fill the directions
 				//array again, but we also go back one room and search again from that room
-				if(directions.length === 0){
+				if(directions.length === 0) {
 
 					//We tried to generate a room in every possible direction
 					//This failed and we are now going back one room
@@ -3679,7 +3800,7 @@ Roguelike.MapFactory.prototype = {
 					tries++;
 
 					//If we are already at the maximum amount of tries, break the loop
-					if(tries >= maxTries){
+					if(tries >= maxTries) {
 						break;
 					}
 
@@ -3687,7 +3808,7 @@ Roguelike.MapFactory.prototype = {
 					directions = ["left", "right", "up", "down"];
 
 					//Get the previous room
-					switch (type){
+					switch(type) {
 
 						//Generate a normal path of rooms, this means we have to generate a room from the previous room
 						case("path"):
@@ -3738,7 +3859,7 @@ Roguelike.MapFactory.prototype = {
 				var newRoom = this.generateRoomNextTo(prevRoom, direction);
 
 				//We try to place a new room for a certain amount of times in the current direction
-				while(!this.map.roomFits(newRoom)){
+				while(!this.map.roomFits(newRoom)) {
 
 					//Check if the limit has been reached, this prevents the while loop from crashing your page
 					//We assume there is no space left on the map and break the loop
@@ -3762,7 +3883,7 @@ Roguelike.MapFactory.prototype = {
 
 				//We see if the room does fit, if it doesn't then well, that's a shame!
 				//Because we aren't putting any more effort into that room.
-				if(this.map.roomFits(newRoom)){
+				if(this.map.roomFits(newRoom)) {
 
 					//The room doesn't intersect and is inside the map boundaries, initialize the room layout
 					newRoom.initialize();
@@ -4157,7 +4278,7 @@ Roguelike.MapFactory.prototype = {
 
 		tile.type = 1;
 		tile.tileRow = 0;
-		tile.tileNumber = Roguelike.Utils.randomNumber(1, 2);
+		tile.tileNumber = 10;
 		tile.blockLight = true;
 
 	}
@@ -4171,10 +4292,51 @@ Roguelike.MapDecorator = function(game) {
 	 */
 	this.game = game;
 
+	/**
+	 * @property {Array} tileArray - An array that stores which bitwise numbers should get certain tiles from the tileset
+	 */
+	this.tileArray = [];
+	
+	//Initialize itself
+	this.initialize();
+
 };
 
 Roguelike.MapDecorator.prototype = {
 
+	/**
+	 * Perform the needed actions before decorating the map
+	 * @protected
+	 */
+	initialize: function(){
+
+		//Filling the tileArray used by the auto tiling in the setTileNumbers function, a more detailed explanation can be found there
+		this.tileArray[0] = [255];
+		this.tileArray[1] = [238, 239, 254];
+		this.tileArray[2] = [125, 204, 253];
+		this.tileArray[3] = [76, 92, 220];
+		this.tileArray[4] = [123, 187, 251];
+		this.tileArray[5] = [122, 152, 186, 192, 200, 216, 218, 234, 250];
+		this.tileArray[6] = [25, 89, 57, 121];
+		this.tileArray[7] = [24, 72, 80, 88];
+		this.tileArray[8] = [134, 166, 230, 231, 247];
+		this.tileArray[9] = [32];
+		this.tileArray[10] = [17, 33, 49, 196];
+		this.tileArray[11] = [16];
+		this.tileArray[12] = [35, 51, 163, 179];
+		this.tileArray[13] = [34, 162, 130];
+		this.tileArray[14] = [64];
+		this.tileArray[15] = [128];
+		this.tileArray[16] = [120];
+		this.tileArray[17] = [178];
+		this.tileArray[18] = [194, 226];
+		
+	},
+
+	/**
+	 * A function that starts the decorating of the map, calling all the necessary functions
+	 * @protected
+	 */
 	decorateMap: function() {
 
 		//Place the entrance and exit on the map
@@ -4194,10 +4356,24 @@ Roguelike.MapDecorator.prototype = {
 
 	/**
 	 * This function sets the correct tileset row and number for each tile
+	 *
+	 * The key of the tileArray is representing the tile on the tileset
+	 * The values represent the results that can come out of the bitwise calculation of surrounding tiles
+	 * Calculating these values is rather easy following this graph:
+	 *
+	 * 16 - 2 - 32
+	 *  8 - x - 2
+	 * 64 - 4 - 128
+	 *
+	 * X is the tile that is currently being checked. For every floor tile that surrounds the current tile
+	 * a certain value is added. For example: If there are floor tiles, above, left and bottom left of the current tile
+	 * you end up with the number 74. This always describes an unique layout on the map and therefore translates to a certain tile on the tileset.
+	 *
 	 * @protected
 	 */
 	setTileNumbers: function() {
 
+		//Get the reference to the map object
 		var map = this.game.map;
 
 		//Loop through every horizontal row
@@ -4206,59 +4382,65 @@ Roguelike.MapDecorator.prototype = {
 			//Loop through every vertical row
 			for(var y = 0; y < map.settings.tilesY; y++) {
 
+				//If the current tile is a wall, perform the autotiling check
 				if(map.tiles[x][y].type === 1) {
 
 					//Get the tile at the location of the possible door location
-					//TODO: Write a function somewhere that returns the surrounding tiles
+					//TODO: Write a function on the map that returns the surrounding tiles
 					var tileLeft = this.game.map.tiles[x - 1][y];
 					var tileRight = this.game.map.tiles[x + 1][y];
 					var tileDown = this.game.map.tiles[x][y + 1];
 					var tileUp = this.game.map.tiles[x][y - 1];
+					var tileUpperLeft = this.game.map.tiles[x - 1][y - 1];
+					var tileUpperRight = this.game.map.tiles[x + 1][y - 1];
+					var tileLowerLeft = this.game.map.tiles[x - 1][y + 1];
+					var tileLowerRight = this.game.map.tiles[x + 1][y + 1];
 
-					//TODO: Maybe use a more elegant autotiling solution for this
-					//Check left type void, right type floor || Check left type void, right type wall, up type void || tileLeft is wall, tileUp is wall and tileDown is wall
-					if(tileLeft.type === 0 && tileRight.type === 2 || tileLeft.type === 0 && tileRight.type === 1 && tileUp.type === 0 || tileLeft.type === 1 && tileUp.type === 1 && tileDown.type === 1 || tileLeft.type === 1 && tileRight.type === 1 && tileUp.type === 0 && tileDown.type === 1) {
+					//Start out with tile number 0
+					var tileNumber = 0;
 
-						map.tiles[x][y].tileNumber = 3;
+					//Check every tile and increment a value when it is a floor typed tile
+					if(tileUp.type === 2){
+						tileNumber += 1;
+					}
+					if(tileRight.type === 2){
+						tileNumber += 2;
+					}
+					if(tileDown.type === 2){
+						tileNumber += 4;
+					}
+					if(tileLeft.type === 2){
+						tileNumber += 8;
+					}
+					if(tileUpperLeft.type === 2){
+						tileNumber += 16;
+					}
+					if(tileUpperRight.type === 2){
+						tileNumber += 32;
+					}
+					if(tileLowerLeft.type === 2){
+						tileNumber += 64;
+					}
+					if(tileLowerRight.type === 2){
+						tileNumber += 128;
+					}
 
-						//Check right type void, left type floor || Check right type void, left type wall, up type void
-					}else if(tileRight.type === 0 && tileLeft.type === 2 || tileRight.type === 0 && tileLeft.type === 1 && tileUp.type === 0 || tileRight.type === 1 && tileUp.type === 1 && tileDown.type === 1 || tileRight.type === 1 && tileLeft.type === 1 && tileUp.type === 1 && tileDown.type === 0) {
+					//Loop through each tile number and see if any of the values inside them match the current tile value
+					for(var index in this.tileArray) {
 
-						map.tiles[x][y].tileNumber = 4;
+						//If the value matches, we choose the key number of this array as the corresponding tile on the spritesheet
+						if(this.tileArray[index].indexOf(tileNumber) !== -1){
 
-						//Check above for a wall, left for a wall and right for void
-					}else if(tileUp.type === 1 && tileLeft.type === 1 && tileRight.type === 0) {
+							//Set the tile number to the corresponding tile
+							map.tiles[x][y].tileNumber = index;
 
-						map.tiles[x][y].tileNumber = 6;
+							//Chose a random row, 0 or 1. This is to add a little more variety in the tiles
+							map.tiles[x][y].tileRow = Roguelike.Utils.randomNumber(0, 1);
 
-						//Check above for a wall, right for a wall and left for void
-					}else if(tileUp.type === 1 && tileRight.type === 1 && tileLeft.type === 0) {
+							//Break the loop because we have found what we are looking for
+							break;
 
-						map.tiles[x][y].tileNumber = 5;
-
-						//Check up for floor, down for wall, left for floor, right for wall
-					}else if(tileUp.type === 2 && tileDown.type === 1 && tileLeft.type === 2 && tileRight.type === 1) {
-
-						map.tiles[x][y].tileRow = 1;
-						map.tiles[x][y].tileNumber = 3;
-
-						//Check up for floor, down for wall, left for wall, right for floor
-					}else if(tileUp.type === 2 && tileDown.type === 1 && tileLeft.type === 1 && tileRight.type === 2) {
-
-						map.tiles[x][y].tileRow = 1;
-						map.tiles[x][y].tileNumber = 2;
-
-						//Check if above is floor, right and left are floor and beneath is a wall
-					}else if(tileUp.type === 2 && tileDown.type === 1 && tileLeft.type === 2 && tileRight.type === 2) {
-
-						map.tiles[x][y].tileRow = 1;
-						map.tiles[x][y].tileNumber = 5;
-
-						//Check if the tiles left and right are floors, and up and down are walls
-					}else if(tileUp.type === 1 && tileDown.type === 1 && tileLeft.type === 2 && tileRight.type === 2 || tileUp.type === 1 && tileDown.type === 1 && tileLeft.type === 2 && tileRight.type === 1) {
-
-						map.tiles[x][y].tileRow = 1;
-						map.tiles[x][y].tileNumber = 4;
+						}
 
 					}
 
@@ -4297,7 +4479,7 @@ Roguelike.MapDecorator.prototype = {
 	 * Get the first room on the roomsToExit list and turns it into the entrance room
 	 * @protected
 	 */
-	placeEntrance: function(){
+	placeEntrance: function() {
 
 		//Let the first room return a random position
 		var entrancePosition = this.game.map.roomsToExit[0].getRandomPosition();
@@ -4317,7 +4499,7 @@ Roguelike.MapDecorator.prototype = {
 	 * Get the last room on the roomsToExit list and turns it into the exit room
 	 * @protected
 	 */
-	placeExit: function(){
+	placeExit: function() {
 
 		//Let the last room return a random position
 		var exitPosition = this.game.map.roomsToExit[this.game.map.roomsToExit.length - 1].getRandomPosition();
@@ -4347,6 +4529,7 @@ Roguelike.MapDecorator.prototype = {
 			var doorLocation = this.game.mapFactory.possibleDoorLocations[i];
 
 			//Get the tile at the location of the possible door location
+			//TODO: Write a function on the map that returns tiles in a certain radius
 			var tileLeft = this.game.map.tiles[doorLocation.x - 1][doorLocation.y];
 			var tileRight = this.game.map.tiles[doorLocation.x + 1][doorLocation.y];
 			var tileUp = this.game.map.tiles[doorLocation.x][doorLocation.y - 1];
@@ -4385,8 +4568,7 @@ Roguelike.MapDecorator.prototype = {
 		var doorEntity = Roguelike.PropFactory.newDoor(this.game, position);
 
 		if(orientation === true) {
-			doorEntity.components.sprite.number = 0;
-			doorEntity.components.sprite.row = 2;
+			doorEntity.components.sprite.tile = 0;
 		}
 
 		//Add the entity to the map
@@ -4400,9 +4582,14 @@ Roguelike.MapDecorator.prototype = {
 
 	},
 
-	populateDungeon: function(){
+	/**
+	 * Populate the dungeon with enemies and or friendlies
+	 * This function is due to some heavy changes
+	 * @protected
+	 */
+	populateDungeon: function() {
 
-		for(var i = 0; i < this.game.map.mediumRooms.length; i++){
+		for(var i = 0; i < this.game.map.mediumRooms.length; i++) {
 
 			var room = this.game.map.mediumRooms[i];
 
@@ -4443,7 +4630,7 @@ Roguelike.MapDecorator.prototype = {
 
 		}
 
-		for(var i = 0; i < this.game.map.hardRooms.length; i++){
+		for(var i = 0; i < this.game.map.hardRooms.length; i++) {
 
 			var room = this.game.map.hardRooms[i];
 
@@ -4553,12 +4740,12 @@ Roguelike.Room.prototype = {
 				if(y === 0 || y === this.h - 1 || x === 0 || x === this.w - 1) {
 
 					//Create a new wall tile
-					this.layout[x][y] = new Roguelike.Tile(1, true, this, 0, Roguelike.Utils.randomNumber(1, 2));
+					this.layout[x][y] = new Roguelike.Tile(1, true, this, 0, 10);
 
 				}else{
 
 					//Create a new floor tile
-					this.layout[x][y] = new Roguelike.Tile(2, false, this, 3, 2);
+					this.layout[x][y] = new Roguelike.Tile(2, false, this, 3, Roguelike.Utils.randomNumber(2, 5));
 
 				}
 
