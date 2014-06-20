@@ -1,0 +1,11 @@
+{
+	"bitwise": true,
+	"camelcase": true,
+	"curly": true,
+	"eqeqeq": true,
+	"es3": false,
+	"forin": true,
+	"immed": true,
+	"newcap": true,
+	"indent": 4
+}
