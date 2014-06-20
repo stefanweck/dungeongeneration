@@ -2,19 +2,20 @@
 
 module.exports = function(grunt) {
 
-	// configure grunt
+	//Configure Grunt
 	grunt.initConfig({
 
 		pkg: grunt.file.readJSON('package.json'),
 
 	});
 
-	// Load plug-ins
-	// grunt.loadNpmTasks('grunt-contrib-whatever');
+	//Load plug-ins
+	grunt.loadNpmTasks('grunt-contrib-concat');
+	grunt.loadNpmTasks('grunt-contrib-uglify');
 
-	// define tasks
+	//Define tasks
 	grunt.registerTask('default', [
-		// No tasks, yet
+		//No tasks, yet
 	]);
 
 };
