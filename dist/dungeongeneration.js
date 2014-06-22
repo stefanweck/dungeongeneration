@@ -2343,6 +2343,11 @@ var LightMap = function(game) {
 		[1, 0, 0, 1, -1, 0, 0, -1]
 	];
 
+	/**
+	 * @property {Boolean} tilesLit - Boolean to see if game tiles have been lit
+	 */
+	this.tilesLit = false;
+
 };
 
 LightMap.prototype = {
@@ -2353,14 +2358,25 @@ LightMap.prototype = {
 	 */
 	update: function() {
 
-		//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
-		var entities = this.game.map.entities.getEntities("lightSource", "position");
+		if (this.game.isActive) {
 
-		//Loop through all matching entities
-		for(var i = 0; i < entities.length; i++) {
+			//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
+			var entities = this.game.map.entities.getEntities("lightSource", "position");
 
-			//Perform the needed operations for this specific system on one entity
-			this.handleSingleEntity(entities[i]);
+			//Loop through all matching entities
+			for(var i = 0; i < entities.length; i++) {
+
+				//Perform the needed operations for this specific system on one entity
+				this.handleSingleEntity(entities[i]);
+
+			}
+
+			this.tilesLit = true;
+
+		}else if(this.tilesLit) {
+
+			this.clear();
+			this.tilesLit = false;
 
 		}
 
@@ -2681,17 +2697,17 @@ Movement.prototype = {
 				//Loop through the components
 				for(var key in nextTile.entities[i].components) {
 
+					//Check if the entity still exists
+					if(typeof nextTile.entities[i] === "undefined") {
+
+						//The entity could have died in a previous bumpInto event
+						//Thus we should abort the loop of the entity no longer exists
+						break;
+
+					}
+
 					//Make sure that obj[key] belongs to the object and was not inherited
 					if (nextTile.entities[i].components.hasOwnProperty(key)) {
-
-						//Check if the entity still exists
-						if(typeof nextTile.entities[i] === "undefined") {
-
-							//The entity could have died in a previous bumpInto event
-							//Thus we should abort the loop of the entity no longer exists
-							break;
-
-						}
 
 						//Check if the component has an events parameter
 						if(typeof nextTile.entities[i].components[key].events !== "undefined") {
