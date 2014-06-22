@@ -1,9 +1,9 @@
-# Random Dungeon Generation V.0.6.3
+# Random Dungeon Generation V.0.6.5
 
 This project started out as a small project to experiment with random dungeon generation. Quickly I began to notice that this was a lot of fun to work with and I added a player. And I added some enemies. And I rewrote the map generator. I added turns. Etc etc, until we ended up here!
 A roguelike game with a random dungeon generator that I am creating purely in javascript on canvas!
 
-_Version: 0.6.3 - Released: 26th May 2014_
+_Version: 0.5.3 - Released: 22th June 2014_
 
 By [Stefan Weck](http://www.stefanweck.nl),
 
@@ -69,17 +69,25 @@ Every room is now a plain old square. I would like to see some more variation in
 
 I provide a fully compiled version of the game in the `dist` folder. Both plain and minified formats are in there.
 
-Open up your console and navigate to the root folder of this project.
+Install NPM if you haven't already done so. NPM is a package manager that ships with Node.js. Then open up your console and navigate to the root folder of this project.
 
-Run `grunt` to perform a new build to the `dist` folder. This way every single script found in the `lib` folder gets concatenated and minified.
+Run `npm install` once to install all the dependencies needed by this project. Next there are a few options:
+
+Run `grunt build` to perform a new build to the `dist` folder. This way Browserify will generate a bundle from every required script in the `lib` folder, this will will also get minified. This is prefered when you are done developing and want to push your new changes, as this version doesn't include the debug map.
+
+Run `grunt dev` to watch every module needed in the project for changes. Watchify will take care of rebuilding the bundle so the only thing you have to do is refresh your browser. No need to run `grunt build` everytime you make a change. This version includes a debug map so you are able to debug single files while the .js file included is still the bundle file.
+
+Run `grunt debug` to let JSHint check the code for you, a tool that helps to detect errors and potential problems in your JavaScript code.
 
 ## Changelog
 
-**V.0.6.3**
+**V.0.6.5**
 
 - Started with decent version numbering
 - Game is now fullscreen
 - Seedable random number generator
+- Started with the UI
+- Converted the whole project to be compatible with Browserify
 
 **V.0.6.0**
 
