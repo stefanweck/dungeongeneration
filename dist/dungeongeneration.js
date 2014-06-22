@@ -173,7 +173,7 @@ Camera.prototype = {
 //Export the Browserify module
 module.exports = Camera;
 
-},{"../geometry/boundary.js":8}],2:[function(require,module,exports){
+},{"../geometry/boundary.js":29}],2:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -182,8 +182,17 @@ var Utils = require('./utils.js'),
     TextLog = require('./textlog.js'),
     Camera = require('./camera.js'),
     Map = require('../tilemap/map.js'),
+    PlayerFactory = require('../factories/playerfactory.js'),
     Vector2 = require('../geometry/vector2.js'),
+    Container = require('../ui/container.js'),
+    TextLogElement = require('../ui/custom/textlog.js'),
     Group = require('../gameobjects/group.js'),
+    Combat = require('../gameobjects/systems/combat.js'),
+    LightMap = require('../gameobjects/systems/lightmap.js'),
+    Movement = require('../gameobjects/systems/movement.js'),
+    Open = require('../gameobjects/systems/open.js'),
+    PathFinding = require('../gameobjects/systems/pathfinding.js'),
+    Render = require('../gameobjects/systems/render.js'),
     MapFactory = require('../tilemap/mapfactory.js'),
     MapDecorator = require('../tilemap/mapdecorator.js'),
     Scheduler = require('../time/scheduler.js'),
@@ -251,7 +260,7 @@ var Game = function(userSettings) {
 	this.camera = null;
 
 	/**
-	 * @property {Roguelike.UI.Container} UI - Reference to the global UI container
+	 * @property {Container} UI - Reference to the global UI container
 	 */
 	this.UI = null;
 
@@ -325,20 +334,20 @@ Game.prototype = {
 		this.initializePlayer();
 
 		//Initialize the movement system
-		this.staticSystems.movementSystem = new Roguelike.Systems.Movement(this);
+		this.staticSystems.movementSystem = new Movement(this);
 
 		//Initialize the movement system
-		this.staticSystems.pathfindingSystem = new Roguelike.Systems.PathFinding(this);
+		this.staticSystems.pathfindingSystem = new PathFinding(this);
 
 		//Initialize the combat system
-		this.staticSystems.combatSystem = new Roguelike.Systems.Combat(this);
+		this.staticSystems.combatSystem = new Combat(this);
 
 		//Initialize the open system
-		this.staticSystems.openSystem = new Roguelike.Systems.Open(this);
+		this.staticSystems.openSystem = new Open(this);
 
 		//Add all systems to the game that need to be looped
-		this.dynamicSystems.push(new Roguelike.Systems.LightMap(this));
-		this.dynamicSystems.push(new Roguelike.Systems.Render(this));
+		this.dynamicSystems.push(new LightMap(this));
+		this.dynamicSystems.push(new Render(this));
 
 		//Create a new text log
 		this.textLog = new TextLog();
@@ -423,11 +432,11 @@ Game.prototype = {
 	initializeUI: function() {
 
 		//Create the global UI container
-		this.UI = new Roguelike.UI.Container(
+		this.UI = new Container(
 			new Vector2(0, 0)
 		);
 
-		var textLog = new Roguelike.UI.Element.TextLog(
+		var textLog = new TextLogElement(
 			new Vector2(15, 15),
 			this
 		);
@@ -499,7 +508,7 @@ Game.prototype = {
 //Export the Browserify module
 module.exports = Game;
 
-},{"../gameobjects/group.js":7,"../geometry/vector2.js":9,"../input/keyboard.js":13,"../tilemap/map.js":15,"../tilemap/mapdecorator.js":16,"../tilemap/mapfactory.js":17,"../time/scheduler.js":21,"./camera.js":1,"./textlog.js":3,"./utils.js":4}],3:[function(require,module,exports){
+},{"../factories/playerfactory.js":7,"../gameobjects/group.js":22,"../gameobjects/systems/combat.js":23,"../gameobjects/systems/lightmap.js":24,"../gameobjects/systems/movement.js":25,"../gameobjects/systems/open.js":26,"../gameobjects/systems/pathfinding.js":27,"../gameobjects/systems/render.js":28,"../geometry/vector2.js":30,"../input/keyboard.js":34,"../tilemap/map.js":37,"../tilemap/mapdecorator.js":38,"../tilemap/mapfactory.js":39,"../time/scheduler.js":43,"../ui/container.js":44,"../ui/custom/textlog.js":45,"./camera.js":1,"./textlog.js":3,"./utils.js":4}],3:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -567,7 +576,11 @@ var MersenneTwister = require('../libraries/mersennetwister.js');
  */
 var Utils = {
 
-	mersenneTwister: new MersenneTwister(404),
+	//Create a new random seed
+	seed: Math.floor(Math.random() * (500 - 1 + 1) + 1),
+
+	//Create a new instance of the Mersenne Twister
+	mersenneTwister: new MersenneTwister(this.seed),
 
 	/**
 	 * Function to generate a random number between two values
@@ -618,12 +631,284 @@ var Utils = {
 //Export the Browserify module
 module.exports = Utils;
 
-},{"../libraries/mersennetwister.js":14}],5:[function(require,module,exports){
+},{"../libraries/mersennetwister.js":36}],5:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
 //Require necessary modules
-var Entity = require('../gameobjects/entity.js');
+var Entity = require('../gameobjects/entity.js'),
+    Position = require('../gameobjects/components/position.js'),
+    Utils = require('../core/utils.js'),
+    Sprite = require('../gameobjects/components/sprite.js');
+
+/**
+ * @class DecorationFactory
+ * @classdesc Decorations are things in the world the player sees but doesn’t interact with: bushes,
+ * debris and other visual detail.
+ */
+var DecorationFactory = {
+
+	/**
+	 * Function that returns a grass object
+	 * @public
+	 *
+	 * @param {Game} game - Reference to the currently running game
+	 * @param {Vector2} position - The position object of this entity
+	 *
+	 * @return {Entity} A decoration entity
+	 */
+	newGrass: function(game, position) {
+
+		//Create the entity
+		var entity = new Entity(game, "Grass");
+
+		//The starting position of the entity
+		entity.addComponent(new Position(position));
+
+		//The entity has a sprite ( color for now )
+		entity.addComponent(new Sprite("decoration", 0, Utils.randomNumber(3, 5)));
+
+		//Return the entity
+		return entity;
+
+	}
+
+};
+
+//Export the Browserify module
+module.exports = DecorationFactory;
+
+},{"../core/utils.js":4,"../gameobjects/components/position.js":17,"../gameobjects/components/sprite.js":18,"../gameobjects/entity.js":21}],6:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+//Require necessary modules
+var Entity = require('../gameobjects/entity.js'),
+    MoveBehaviours = require('../gameobjects/behaviours/moveBehaviours.js'),
+    Position = require('../gameobjects/components/position.js'),
+    CanOpen = require('../gameobjects/components/canopen.js'),
+    Collide = require('../gameobjects/components/collide.js'),
+    Health = require('../gameobjects/components/health.js'),
+    CanFight = require('../gameobjects/components/canfight.js'),
+    Weapon = require('../gameobjects/components/weapon.js'),
+    MovementComponent = require('../gameobjects/components/movement.js'),
+    Tooltip = require('../gameobjects/components/tooltip.js'),
+    Sprite = require('../gameobjects/components/sprite.js');
+
+/**
+ * @class EnemyFactory
+ * @classdesc A factory that returns pre made enemies with
+ * a set of components
+ */
+var EnemyFactory = {
+
+	/**
+	 * Function that returns a new spider entity
+	 * @public
+	 *
+	 * @param {Game} game - Reference to the currently running game
+	 * @param {Vector2} position - The position object of this entity
+	 *
+	 * @return {Entity} An enemy entity
+	 */
+	newSpider: function(game, position) {
+
+		//Create the entity
+		var entity = new Entity(game, "Quick Spider", 2000);
+
+		//Give the entity a health of 100 points
+		entity.addComponent(new Health(20));
+
+		//The starting position of the entity
+		entity.addComponent(new Position(position));
+
+		//The entity has a sprite
+		entity.addComponent(new Sprite("entities", 1, 2));
+
+		//You can collide with this entity
+		entity.addComponent(new Collide(true));
+
+		//Add a certain move behaviour to this entity
+		entity.addComponent(new MovementComponent(
+			game,
+			entity,
+			MoveBehaviours.walkBehaviour()
+		));
+
+		//The entity has a weapon
+		//TODO: Change this to a loadout. Something that says: Hey you are wearing this and this and this
+		entity.addComponent(new Weapon(4));
+
+		//This entity is capable of fighting
+		entity.addComponent(new CanFight(game));
+
+		//Add a tooltip to this entity
+		entity.addComponent(new Tooltip(
+			game.settings.canvas,
+			entity.name,
+			"Arachnid Enemy",
+			"The quick spider is twice as fast as you and will definitely attack you. It's just programmed to do so."
+		));
+
+		//Return the entity
+		return entity;
+
+	},
+
+	/**
+	 * Function that returns a new skeleton entity
+	 * @public
+	 *
+	 * @param {Game} game - Reference to the currently running game
+	 * @param {Vector2} position - The position object of this entity
+	 *
+	 * @return {Entity} An enemy entity
+	 */
+	newSkeleton: function(game, position) {
+
+		//Create the entity
+		var entity = new Entity(game, "Skeleton", 1000);
+
+		//Give the entity a health of 100 points
+		entity.addComponent(new Health(50));
+
+		//The starting position of the entity
+		entity.addComponent(new Position(position));
+
+		//The entity has a sprite
+		entity.addComponent(new Sprite("entities", 2, 0));
+
+		//You can collide with this entity
+		entity.addComponent(new Collide(true));
+
+		//Add a certain move behaviour to this entity
+		entity.addComponent(new MovementComponent(
+			game,
+			entity,
+			MoveBehaviours.walkBehaviour()
+		));
+
+		//The entity has a weapon
+		//TODO: Change this to a loadout. Something that says: Hey you are wearing this and this and this
+		entity.addComponent(new Weapon(10));
+
+		//This entity is capable of fighting
+		entity.addComponent(new CanFight(game));
+
+		//Add a tooltip to this entity
+		entity.addComponent(new Tooltip(
+			game.settings.canvas,
+			entity.name,
+			"Undead Enemy",
+			"The skeleton is a very dangerous but unstable enemy. If you stab just right his bones will collapse."
+		));
+
+		//Return the entity
+		return entity;
+
+	}
+
+};
+
+//Export the Browserify module
+module.exports = EnemyFactory;
+
+},{"../gameobjects/behaviours/moveBehaviours.js":9,"../gameobjects/components/canfight.js":10,"../gameobjects/components/canopen.js":11,"../gameobjects/components/collide.js":12,"../gameobjects/components/health.js":13,"../gameobjects/components/movement.js":16,"../gameobjects/components/position.js":17,"../gameobjects/components/sprite.js":18,"../gameobjects/components/tooltip.js":19,"../gameobjects/components/weapon.js":20,"../gameobjects/entity.js":21}],7:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+//Require necessary modules
+var Entity = require('../gameobjects/entity.js'),
+    Health = require('../gameobjects/components/health.js'),
+    LightSource = require('../gameobjects/components/lightsource.js'),
+    Collide = require('../gameobjects/components/collide.js'),
+    Weapon = require('../gameobjects/components/weapon.js'),
+    KeyboardControl = require('../gameobjects/components/keyboardcontrol.js'),
+    CanFight = require('../gameobjects/components/canfight.js'),
+    Tooltip = require('../gameobjects/components/tooltip.js'),
+    Sprite = require('../gameobjects/components/sprite.js'),
+    Position = require('../gameobjects/components/position.js');
+
+/**
+ * @class PlayerFactory
+ * @classdesc A factory that returns pre made player entities with
+ * a set of components
+ */
+var PlayerFactory = {
+
+	/**
+	 * Function that returns a new warrior
+	 * @public
+	 *
+	 * @param {Game} game - Reference to the currently running game
+	 * @param {Vector2} position - The position object of this entity
+	 * @param {Object} controls - Associative array with every control this entity uses
+	 *
+	 * @return {Entity} A player entity
+	 */
+	newPlayerWarrior: function(game, position, controls) {
+
+		//Create the entity
+		var entity = new Entity(game, "You", 1000);
+
+		//Give the player a health of 100 points
+		entity.addComponent(new Health(100));
+
+		//The starting position of the player is at the dungeon's entrance
+		entity.addComponent(new Position(position));
+
+		//The player has a sprite
+		entity.addComponent(new Sprite("entities", 0, 0));
+
+		//The player must be controllable by the keyboards arrow keys
+		entity.addComponent(new KeyboardControl(
+			game,
+			entity,
+			controls
+		));
+
+		//Add a lightsource to the player
+		entity.addComponent(new LightSource(true, 6));
+
+		//You can collide with this entity
+		entity.addComponent(new Collide(true));
+
+		//The entity has a weapon
+		//TODO: Change this to a loadout. Something that says: Hey you are wearing this and this and this
+		entity.addComponent(new Weapon(7));
+
+		//This entity is capable of fighting
+		entity.addComponent(new CanFight(game));
+
+		//Add a tooltip to this entity
+		entity.addComponent(new Tooltip(
+			game.settings.canvas,
+			"Player",
+			"",
+			""
+		));
+
+		//Return the entity
+		return entity;
+
+	}
+
+};
+
+//Export the Browserify module
+module.exports = PlayerFactory;
+
+},{"../gameobjects/components/canfight.js":10,"../gameobjects/components/collide.js":12,"../gameobjects/components/health.js":13,"../gameobjects/components/keyboardcontrol.js":14,"../gameobjects/components/lightsource.js":15,"../gameobjects/components/position.js":17,"../gameobjects/components/sprite.js":18,"../gameobjects/components/tooltip.js":19,"../gameobjects/components/weapon.js":20,"../gameobjects/entity.js":21}],8:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+//Require necessary modules
+var Entity = require('../gameobjects/entity.js'),
+    Position = require('../gameobjects/components/position.js'),
+    CanOpen = require('../gameobjects/components/canopen.js'),
+    Collide = require('../gameobjects/components/collide.js'),
+    Tooltip = require('../gameobjects/components/tooltip.js'),
+    Sprite = require('../gameobjects/components/sprite.js');
 
 /**
  * @class PropFactory
@@ -650,7 +935,7 @@ var PropFactory = {
 		entity.addComponent(new Position(position));
 
 		//The entity has a sprite ( color for now )
-		entity.addComponent(new Roguelike.Components.Sprite("tileset", 3, 1));
+		entity.addComponent(new Sprite("tileset", 3, 1));
 
 		//Return the entity
 		return entity;
@@ -675,7 +960,7 @@ var PropFactory = {
 		entity.addComponent(new Position(position));
 
 		//The entity has a sprite ( color for now )
-		entity.addComponent(new Roguelike.Components.Sprite("tileset", 3, 0));
+		entity.addComponent(new Sprite("tileset", 3, 0));
 
 		//Return the entity
 		return entity;
@@ -700,16 +985,16 @@ var PropFactory = {
 		entity.addComponent(new Position(position));
 
 		//The entity has a sprite ( color for now )
-		entity.addComponent(new Roguelike.Components.Sprite("tileset", 2, 2));
+		entity.addComponent(new Sprite("tileset", 2, 2));
 
 		//This entity can be opened up by another entity
-		entity.addComponent(new Roguelike.Components.CanOpen(game, entity));
+		entity.addComponent(new CanOpen(game, entity));
 
 		//You can collide with this entity
-		entity.addComponent(new Roguelike.Components.Collide(true));
+		entity.addComponent(new Collide(true));
 
 		//Add a tooltip to this entity
-		entity.addComponent(new Roguelike.Components.Tooltip(
+		entity.addComponent(new Tooltip(
 			game.settings.canvas,
 			entity.name,
 			"Closed",
@@ -726,7 +1011,932 @@ var PropFactory = {
 //Export the Browserify module
 module.exports = PropFactory;
 
-},{"../gameobjects/entity.js":6}],6:[function(require,module,exports){
+},{"../gameobjects/components/canopen.js":11,"../gameobjects/components/collide.js":12,"../gameobjects/components/position.js":17,"../gameobjects/components/sprite.js":18,"../gameobjects/components/tooltip.js":19,"../gameobjects/entity.js":21}],9:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+/**
+ * @class MoveBehaviours
+ * @classdesc An object that holds all move behaviours used in the Movement component
+ */
+var MoveBehaviours = {
+
+	/**
+	 * Function that returns a new walk behaviour
+	 * @public
+	 *
+	 * @return {Function} A function used in the strategy pattern
+	 */
+	walkBehaviour: function() {
+
+		return function(game, entity) {
+
+			//Array with all the acceptable/walkable tiles for this move behaviour
+			var acceptableTiles = [2];
+
+			//Make a call to the pathfinding system
+			game.staticSystems.pathfindingSystem.handleSingleEntity(entity, acceptableTiles);
+
+		};
+
+	},
+
+	/**
+	 * Function that returns a new fly behaviour
+	 * @public
+	 *
+	 * @return {Function} A function used in the strategy pattern
+	 */
+	flyBehaviour: function() {
+
+		return function(game, entity) {
+
+			//Array with all the acceptable/walkable tiles for this move behaviour
+			var acceptableTiles = [2];
+
+			//Make a call to the pathfinding system
+			game.staticSystems.pathfindingSystem.handleSingleEntity(entity, acceptableTiles);
+
+		};
+
+	}
+
+};
+
+//Export the Browserify module
+module.exports = MoveBehaviours;
+
+},{}],10:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+//Require necessary modules
+var Event = require('../../input/event.js');
+
+/**
+ * CanFight Component constructor
+ *
+ * @class CanFight
+ * @classdesc An component that tells the system that this entity can fight!
+ *
+ * @property {Game} game - Reference to the current game object
+ */
+var CanFight = function(game) {
+
+	/**
+	 * @property {String} name - The name of this system. This field is always required!
+	 */
+	this.name = 'canFight';
+
+	/**
+	 * @property {Game} game - Reference to the current game object
+	 */
+	this.game = game;
+
+	/**
+	 * @property {Event} events - Event holder
+	 */
+	this.events = new Event();
+
+	//Initialize the component
+	this.initialize();
+
+};
+
+CanFight.prototype = {
+
+	/**
+	 * The 'constructor' for this component
+	 * Adds the bump into function to the event list
+	 * @protected
+	 */
+	initialize: function() {
+
+		//Attach the bumpInto function to the bumpInto event
+		this.events.on('bumpInto', this.bumpInto, this);
+
+	},
+
+	/**
+	 * Function to perform when something collides with this entity
+	 * @protected
+	 */
+	bumpInto: function(entity, collisionEntity) {
+
+		//The combat system will handle the combat!
+		this.game.staticSystems.combatSystem.handleSingleEntity(entity, collisionEntity);
+
+	}
+
+};
+
+//Export the Browserify module
+module.exports = CanFight;
+
+},{"../../input/event.js":32}],11:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+//Require necessary modules
+var Event = require('../../input/event.js');
+
+/**
+ * CanOpen Component constructor
+ *
+ * @class CanOpen
+ * @classdesc An component that tells the system that this entity can be opened by another entity
+ *
+ * @param {Game} game - Reference to the current game object
+ * @param {Entity} entity - Reference to the entity that has this component
+ */
+var CanOpen = function(game, entity) {
+
+	/**
+	 * @property {String} name - The name of this system. This field is always required!
+	 */
+	this.name = 'canOpen';
+
+	/**
+	 * @property {Game} game - Reference to the current game object
+	 */
+	this.game = game;
+
+	/**
+	 * @property {Entity} entity - Reference to the entity that has this component
+	 */
+	this.entity = entity;
+
+	/**
+	 * @property {Event} events - Event holder
+	 */
+	this.events = new Event();
+
+	/**
+	 * @property {String} state - The state of this door, closed opened etc
+	 */
+	this.state = 'closed';
+
+	//Initialize the component
+	this.initialize();
+
+};
+
+CanOpen.prototype = {
+
+	/**
+	 * The 'constructor' for this component
+	 * Adds the bump into function to the event list
+	 * @protected
+	 */
+	initialize: function() {
+
+		//Attach the bumpInto function to the bumpInto event
+		this.events.on('bumpInto', this.bumpInto, this);
+
+	},
+
+	/**
+	 * Function to perform when something collides with this entity
+	 * @protected
+	 */
+	bumpInto: function() {
+
+		//The Open System will handle opening or closing this door
+		this.game.staticSystems.openSystem.handleSingleEntity(this.entity);
+
+	}
+
+};
+
+//Export the Browserify module
+module.exports = CanOpen;
+
+},{"../../input/event.js":32}],12:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+/**
+ * Collide Component constructor
+ *
+ * @class Collide
+ * @classdesc A component that tells if the entity is passable or not
+ */
+var Collide = function(collide) {
+
+	/**
+	 * @property {String} name - The name of this system. This field is always required!
+	 */
+	this.name = 'collide';
+
+	/**
+	 * @property {Boolean} collide - True or false depending on if it should collide with other entities
+	 */
+	this.collide = collide;
+
+};
+
+//Export the Browserify module
+module.exports = Collide;
+
+},{}],13:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+/**
+ * Health Component constructor
+ *
+ * @class Health
+ * @classdesc The health component is responsible for managing the health
+ *
+ * @param {Number} maxHealth - The new and maximum health of the entity
+ */
+var Health = function(maxHealth) {
+
+	/**
+	 * @property {String} name - The name of this system. This field is always required!
+	 */
+	this.name = 'health';
+
+	/**
+	 * @property {Number} minHealth - The minimum health of the entity
+	 */
+	this.minHealth = 0;
+
+	/**
+	 * @property {Number} health - The starting, and maximum health of the entity
+	 */
+	this.health = this.maxHealth = maxHealth;
+
+};
+
+Health.prototype = {
+
+	/**
+	 * Returns the percentage of health that is left
+	 * @protected
+	 *
+	 * @return {Number} Percentage rounded to 2 decimals
+	 */
+	percentage: function() {
+
+		//Return the percentage
+		return this.health / this.maxHealth;
+
+	},
+
+	/**
+	 * Check if the entity has full health
+	 * @protected
+	 *
+	 * @return {Boolean} True when full health, false when damaged
+	 */
+	isDamaged: function() {
+
+		//Return true or false based on the entities health
+		return this.health < this.maxHealth;
+
+	},
+
+	/**
+	 * Check whether the entity is dead
+	 * @protected
+	 *
+	 * @return {Boolean} True when dead, false when alive
+	 */
+	isDead: function() {
+
+		//Return true or false based on the entities health
+		return this.health <= this.minHealth;
+
+	},
+
+	/**
+	 * Function to take damage
+	 * @protected
+	 */
+	takeDamage: function(damage) {
+
+		//Subtract the damage from the health of this entity
+		this.health -= damage;
+
+		//If the health drops below the minimum health, set it to the minimum health
+		if(this.health < this.minHealth) {
+
+			this.health = this.minHealth;
+
+		}
+
+	}
+
+};
+
+//Export the Browserify module
+module.exports = Health;
+
+},{}],14:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+//Require necessary modules
+var Vector2 = require('../../geometry/vector2.js');
+
+/**
+ * KeyboardControl Component constructor
+ *
+ * @class KeyboardControl
+ * @classdesc An component that tells the system that this entity can be controlled with the keyboard
+ *
+ * @param {Game} game - Reference to the current game object
+ * @param {Entity} entity - Reference to the entity that has this component
+ * @param {Object} controls - Associative array with every control that this entity uses
+ */
+var KeyboardControl = function(game, entity, controls) {
+
+	/**
+	 * @property {String} name - The name of this system. This field is always required!
+	 */
+	this.name = 'keyboardControl';
+
+	/**
+	 * @property {Entity} entity - Reference to the entity that has this component
+	 */
+	this.entity = entity;
+
+	/**
+	 * @property {Game} game - Reference to the current game object
+	 */
+	this.game = game;
+
+	/**
+	 * @property {Array} controls - Associative array with every control that this entity uses
+	 */
+	this.controls = controls;
+
+	/**
+	 * @property {Keyboard} keyboard - Reference to the keyboard object
+	 */
+	this.keyboard = game.keyboard;
+
+	/**
+	 * @property {Scheduler} scheduler - Reference to the scheduler object
+	 */
+	this.scheduler = game.scheduler;
+
+	//Initialize the component
+	this.initialize();
+
+};
+
+KeyboardControl.prototype = {
+
+	/**
+	 * The 'constructor' for this component
+	 * Adds the event listener for keyboards events on this entity
+	 * @protected
+	 */
+	initialize: function() {
+
+		//Loop through each control keycode of this entity
+		for(var key in this.controls) {
+
+			//Make sure that obj[key] belongs to the object and was not inherited
+			if (this.controls.hasOwnProperty(key)) {
+
+				switch(key) {
+
+					case("left"):
+
+						//Add up key and tell it to move the entities up when it hits
+						var leftKey = this.keyboard.getKey(this.controls[key]);
+
+						//Attach the new position function to the keydown event
+						leftKey.onDown.on(this.controls[key], this.newPosition.bind(this, "left"), this);
+
+						break;
+
+					case("right"):
+
+						//Add up key and tell it to move the entities up when it hits
+						var rightKey = this.keyboard.getKey(this.controls[key]);
+
+						//Attach the new position function to the keydown event
+						rightKey.onDown.on(this.controls[key], this.newPosition.bind(this, "right"), this);
+
+						break;
+
+					case("up"):
+
+						//Add up key and tell it to move the entities up when it hits
+						var upKey = this.keyboard.getKey(this.controls[key]);
+
+						//Attach the new position function to the keydown event
+						upKey.onDown.on(this.controls[key], this.newPosition.bind(this, "up"), this);
+
+						break;
+
+					case("down"):
+
+						//Add up key and tell it to move the entities up when it hits
+						var downKey = this.keyboard.getKey(this.controls[key]);
+
+						//Attach the new position function to the keydown event
+						downKey.onDown.on(this.controls[key], this.newPosition.bind(this, "down"), this);
+
+						break;
+
+				}
+
+			}
+
+		}
+
+	},
+
+	/**
+	 * The function that gets called when a player moves
+	 * @protected
+	 *
+	 * @param {String} direction - The direction the entities are being moved
+	 */
+	newPosition: function(direction) {
+
+		//Define variables
+		var movement;
+
+		//Check which controls are being pressed and update the player accordingly
+		switch(direction) {
+
+			case ("left"):
+
+				movement = new Vector2(-1, 0);
+
+				break;
+
+			case ("up"):
+
+				movement = new Vector2(0, -1);
+
+				break;
+
+			case ("right"):
+
+				movement = new Vector2(1, 0);
+
+				break;
+
+			case ("down"):
+
+				movement = new Vector2(0, 1);
+
+				break;
+
+		}
+
+		//Get the components
+		var positionComponent = this.entity.getComponent("position");
+
+		//Calculate the new position
+		var newPosition = positionComponent.position.combine(movement);
+
+		//Tell the movement system that you want to move to the new position
+		this.game.staticSystems.movementSystem.handleSingleEntity(this.entity, newPosition);
+
+		//Unlock the scheduler because the player has moved
+		this.scheduler.unlock();
+
+	}
+
+};
+
+//Export the Browserify module
+module.exports = KeyboardControl;
+
+
+},{"../../geometry/vector2.js":30}],15:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+/**
+ * LightSource Component constructor
+ *
+ * @class LightSource
+ * @classdesc The Lightsource component tells the system that this object emits light
+ *
+ * @param {Boolean} gradient - Should this lightsource render with a gradient
+ * @param {Number} radius - The radius of the light, how far does it shine it's light!
+ */
+var LightSource = function(gradient, radius) {
+
+	/**
+	 * @property {String} name - The name of this system. This field is always required!
+	 */
+	this.name = 'lightSource';
+
+	/**
+	 * @property {Boolean} gradient - Should the lightmap be drawn with a gradient
+	 */
+	this.gradient = gradient;
+
+	/**
+	 * @property {Number} radius - The radius of the light, how far does it shine it's magical light!
+	 */
+	this.radius = radius;
+
+};
+
+//Export the Browserify module
+module.exports = LightSource;
+
+},{}],16:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+/**
+ * Movement Component constructor
+ *
+ * @class MovementComponent
+ * @classdesc A component that tells the behaviour of an entity, is it aggressive, does it try to flee,
+ *
+ * @param {Game} game - Reference to the currently running game
+ * @param {Entity} entity - Reference to the entity that has this component
+ * @param {Function} func - The move functionality that is defined in moveBehaviours.js
+ */
+var MovementComponent = function(game, entity, func) {
+
+	/**
+	 * @property {String} name - The name of this system. This field is always required!
+	 */
+	this.name = 'movement';
+
+	/**
+	 * @property {Game} game - Reference to the current game object
+	 */
+	this.game = game;
+
+	/**
+	 * @property {Entity} entity - Reference to the entity that has this component
+	 */
+	this.entity = entity;
+
+	/**
+	 * @property {Function} func - The move functionality that is defined in moveBehaviours.js
+	 */
+	this.move = func;
+
+};
+
+MovementComponent.prototype = {
+
+	/**
+	 * Initialize the game, create all objects
+	 * @protected
+	 */
+	execute: function() {
+
+		//Execute the move behaviour applied to this component
+		this.move(this.game, this.entity);
+
+	}
+
+};
+
+//Export the Browserify module
+module.exports = MovementComponent;
+
+},{}],17:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+/**
+ * Position Component constructor
+ *
+ * @class Position
+ * @classdesc The position component holds x and y position of the entity
+ *
+ * @param {Vector2} position - The position object of this entity
+ */
+var Position = function(position) {
+
+	/**
+	 * @property {String} name - The name of this system. This field is always required!
+	 */
+	this.name = 'position';
+
+	/**
+	 * @property {Vector2} position - The position object of this entity
+	 */
+	this.position = position;
+
+};
+
+//Export the Browserify module
+module.exports = Position;
+
+},{}],18:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+/**
+ * Sprite Component constructor
+ *
+ * @class Sprite
+ * @classdesc Determines how an entity looks!
+ *
+ * @param {String} sprite - The string of the sprite that is being used
+ * @param {Number} row - The row that the sprite is on, on the tileset
+ * @param {Number} tile - The specific tile that the sprite is on, on the tileset
+ * @param {Object} offset - Optional object that described he horizontal and vertical offset of this sprite
+ */
+var Sprite = function(sprite, row, tile, offset) {
+
+	/**
+	 * @property {String} name - The name of this system. This field is always required!
+	 */
+	this.name = 'sprite';
+
+	/**
+	 * @property {String} sprite - The sprite image of this entity
+	 */
+	this.sprite = sprite;
+
+	/**
+	 * @property {Number} row - The row that the sprite is on, on the tileset
+	 */
+	this.row = row;
+
+	/**
+	 * @property {Number} tile - The specific tile that the sprite is on, on the tileset
+	 */
+	this.tile = tile;
+
+	/**
+	 * @property {Object} offset - The horizontal and vertical offset of this sprite, used for example to render something a little above of below it's position
+	 */
+	this.offset = offset || {x: 0, y: 0};
+
+	/**
+	 * @property {String} direction - The direction this sprite is facing. Left, right, up, down.
+	 */
+	this.direction = "right";
+
+};
+
+Sprite.prototype = {
+
+	/**
+	 * Return the tile that should be rendered, based on the direction
+	 * @protected
+	 *
+	 * @return {Number} Returns the tile number
+	 */
+	getTileNumber: function() {
+
+		//Switch between all possible directions
+		switch(this.direction) {
+
+			default:
+			case("right"):
+
+				return this.tile;
+
+			case("left"):
+
+				return this.tile + 1;
+
+		}
+
+	}
+
+};
+
+//Export the Browserify module
+module.exports = Sprite;
+
+},{}],19:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+/**
+ * Tooltip Component constructor
+ *
+ * @class Tooltip
+ * @classdesc A tooltip that will show up when the player hovers his mouse over the entity
+ *
+ * /**
+ * @param {Object} canvas - The current canvas object
+ * @param {String} title - The title of the tooltip
+ * @param {String} type - The type of entity
+ * @param {String} description - The description of this entity
+ */
+var Tooltip = function(canvas, title, type, description) {
+
+	/**
+	 * @property {String} name - The name of this system. This field is always required!
+	 */
+	this.name = 'tooltip';
+
+	/**
+	 * @property {Object} context - The 2D context of the current canvas object
+	 */
+	this.context = canvas.getContext("2d");
+
+	/**
+	 * @property {Number} width - The width of the tooltip
+	 */
+	this.width = 150;
+
+	/**
+	 * @property {Number} maxWidth - The maximum width of the tooltip
+	 */
+	this.maxWidth = 0;
+
+	/**
+	 * @property {Number} fontSize - The size of the font in this tooltip
+	 */
+	this.fontSize = 12;
+
+	/**
+	 * @property {String} font - The font used in the tooltips
+	 */
+	this.font = "Courier New";
+
+	/**
+	 * @property {Array} title - The title of the tooltip
+	 */
+	this.title = this.splitText(title, this.context);
+
+	/**
+	 * @property {Array} type - The type of entity
+	 */
+	this.type = this.splitText(type, this.context);
+
+	/**
+	 * @property {Array} description - The description of this entity
+	 */
+	this.description = this.splitText(description, this.context);
+
+};
+
+Tooltip.prototype = {
+
+	/**
+	 * Splits up a sentence in words and measures how many words can fit on one line
+	 * It then divides the words over multiple lines
+	 * @protected
+	 *
+	 * @param {String} text - The text to be split up into multiple lines
+	 * @param {Object} context - The 2D context of the current canvas object
+	 *
+	 * @return {Array} Returns an array with all the separate lines of text
+	 */
+	splitText: function(text, context) {
+
+		//If there isn't any text, return an empty array
+		if(text === "") {
+			return [];
+		}
+
+		//Define variables
+		var words = text.split(' ');
+		var lines = [];
+		var currentLine = "";
+
+		//Set the current fontsize to the context of the canvas
+		context.font = this.fontSize + "px " + this.font;
+
+		//If the text doesn't exceed the maximum width, don't bother splitting it up in separate lines
+		if(context.measureText(text).width < this.width) {
+
+			//Check if the current line is the longest line
+			this.checkLongestLine(text);
+
+			//Return the text in an array
+			return [text];
+
+		}
+
+		//If we reached this point that means the maximum width is has been reached, we have to split up the sentence
+		while(words.length > 0) {
+
+			//Define variables
+			var newSentence;
+
+			//Check if we have to add an extra space at the beginning
+			if(currentLine === "") {
+
+				newSentence = words[0];
+
+			}else{
+
+				//Create what should be the new sentence
+				newSentence = currentLine + " " + words[0];
+
+			}
+
+			///Check if the new sentence exceeds the maximum width
+			if(context.measureText(newSentence).width < this.width) {
+
+				//Create what should be the new sentence
+				if(currentLine === "") {
+
+					//We don't exceed the maximum width so we can add the word to the currentLine
+					currentLine += words.splice(0, 1);
+
+				}else{
+
+					//We don't exceed the maximum width so we can add the word to the currentLine
+					currentLine += " " + words.splice(0, 1);
+
+				}
+
+			}else{
+
+				//Check if the current line is the longest line
+				this.checkLongestLine(currentLine);
+
+				//We exceed the maximum width so the new word has to be placed on a new line
+				lines.push(currentLine);
+
+				//Clear the current line again
+				currentLine = "";
+
+			}
+
+			//If there aren't any words left, we push whatever is left in the current line to the lines array
+			if(words.length === 0 && currentLine.length > 0) {
+
+				//Check if the current line is the longest line
+				this.checkLongestLine(currentLine);
+
+				lines.push(currentLine);
+
+			}
+
+		}
+
+		//Return the array of lines
+		return lines;
+
+	},
+
+	/**
+	 * Checks if a string is longer than any string checked before.
+	 * This way I can use the longest string for rendering the tooltips background
+	 * @protected
+	 *
+	 * @param {String} text - The text to be measured
+	 */
+	checkLongestLine: function(text) {
+
+		//Measure the length of the supplied text
+		var textLength = this.context.measureText(text).width;
+
+		//If the text is longer than the longest line
+		if(textLength > this.maxWidth) {
+
+			//Then this will be the new longest line
+			this.maxWidth = textLength;
+
+		}
+
+	}
+
+};
+
+//Export the Browserify module
+module.exports = Tooltip;
+
+},{}],20:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+/**
+ * Weapon Component constructor
+ *
+ * @class Weapon
+ * @classdesc The weapon of an entity
+ * NOTE: this class is due to some heavy changes
+ *
+ * @param {Number} damage - The damage that this weapon does
+ */
+var Weapon = function(damage) {
+
+	/**
+	 * @property {String} name - The name of this system. This field is always required!
+	 */
+	this.name = 'weapon';
+
+	/**
+	 * @property {Number} damage - The damage that this weapon does
+	 */
+	this.damage = damage;
+
+};
+
+//Export the Browserify module
+module.exports = Weapon;
+
+},{}],21:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -861,9 +2071,12 @@ Entity.prototype = {
 //Export the Browserify module
 module.exports = Entity;
 
-},{}],7:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
+
+//Require necessary modules
+var Entity = require('../gameobjects/entity.js');
 
 /**
  * Control constructor
@@ -983,7 +2196,1205 @@ Group.prototype = {
 //Export the Browserify module
 module.exports = Group;
 
-},{}],8:[function(require,module,exports){
+},{"../gameobjects/entity.js":21}],23:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+/**
+ * Combat System constructor
+ *
+ * @class Combat
+ * @classdesc The system that handles combat
+ *
+ * @param {Game} game - Reference to the currently running game
+ */
+var Combat = function(game) {
+
+	/**
+	 * @property {Game} game - Reference to the current game object
+	 */
+	this.game = game;
+
+};
+
+Combat.prototype = {
+
+	/**
+	 * Performs the needed operations for this specific system on one entity
+	 * @protected
+	 *
+	 * @param {Entity} entity - The entity that is being processed by this system
+	 * @param {Entity} enemyEntity - The entity that is being attacked
+	 */
+	handleSingleEntity: function(entity, enemyEntity) {
+
+		//Get the components from the current entity and store them temporarily in a variable
+		var weaponComponent = entity.getComponent("weapon");
+
+		//Check if the enemy even has a health component before we try to hit it
+		if(enemyEntity.hasComponent("health")) {
+
+			//Get the current entities components
+			var healthComponent = enemyEntity.getComponent("health");
+
+			//The weapon of the current entity should damage to the current enemy
+			healthComponent.takeDamage(weaponComponent.damage);
+
+			//Generate the TextLog message
+			var textLogMessage = entity.name+" hit "+enemyEntity.name+" for "+weaponComponent.damage+" damage";
+
+			//If the enemy is dead, we have to remove him from the game
+			if(healthComponent.isDead()) {
+
+				//Add the current enemy to the remove stack, this way the loop doesn't get interrupted
+				this.removeEntity(enemyEntity);
+
+				//Add another string to the message
+				textLogMessage += " and killed him with that attack!";
+
+			}
+
+			//Add the text log message to the textlog
+			this.game.textLog.addMessage(textLogMessage);
+
+		}
+
+	},
+
+	/**
+	 * Remove a dead entity
+	 * @protected
+	 *
+	 * @param {Entity} entity - The entity that is dead
+	 */
+	removeEntity: function(entity) {
+
+		//Check for the player entity being removed
+		if(entity.hasComponent("keyboardControl")) {
+
+			//Lock the scheduler to stop the game
+			this.game.scheduler.lock();
+			//Make the game inactive
+			this.game.isActive = false;
+
+		}
+
+		//Remove the entity from the map's list
+		this.game.map.entities.removeEntity(entity);
+
+		//Remove the entity from the scheduler
+		this.game.scheduler.remove(entity);
+
+		//Get the components of this entity
+		var positionComponent = entity.getComponent("position");
+
+		//Get the tile that the entity ws standing on
+		var currentTile = this.game.map.tiles[positionComponent.position.x][positionComponent.position.y];
+
+		//Remove the entity from the tile it was standing on
+		currentTile.removeEntity(entity);
+
+	}
+
+};
+
+//Export the Browserify module
+module.exports = Combat;
+
+},{}],24:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+//Require necessary modules
+var Vector2 = require('../../geometry/vector2.js');
+
+/**
+ * LightMap System constructor
+ *
+ * @class LightMap
+ * @classdesc The lightmap system recalculates the lightmap and makes sure that explored areas are visible
+ *
+ * @param {Game} game - Reference to the currently running game
+ */
+var LightMap = function(game) {
+
+	/**
+	 * @property {Game} game - Reference to the current game object
+	 */
+	this.game = game;
+
+	/**
+	 * @property {Object} mapSize - The size of the current map
+	 */
+	this.mapSize = {x: game.map.settings.tilesX, y: game.map.settings.tilesY};
+
+	/**
+	 * @property {Object} tiles - Object that is being used to store tile data before returning it
+	 */
+	this.tiles = [];
+
+	/**
+	 * @property {Array} mult - Multipliers for transforming coordinates into other octants
+	 */
+	this.mult = [
+		[1, 0, 0, -1, -1, 0, 0, 1],
+		[0, 1, -1, 0, 0, -1, 1, 0],
+		[0, 1, 1, 0, 0, -1, -1, 0],
+		[1, 0, 0, 1, -1, 0, 0, -1]
+	];
+
+};
+
+LightMap.prototype = {
+
+	/**
+	 * Function that gets called when the game continues one tick
+	 * @protected
+	 */
+	update: function() {
+
+		//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
+		var entities = this.game.map.entities.getEntities("lightSource", "position");
+
+		//Loop through all matching entities
+		for(var i = 0; i < entities.length; i++) {
+
+			//Perform the needed operations for this specific system on one entity
+			this.handleSingleEntity(entities[i]);
+
+		}
+
+	},
+
+	/**
+	 * Performs the needed operations for this specific system on one entity
+	 * @protected
+	 *
+	 * @param {Entity} entity - The entity that is being processed by this system
+	 */
+	handleSingleEntity: function(entity) {
+
+		//Get the keyboardControl component
+		var lightSourceComponent = entity.getComponent("lightSource");
+		var positionComponent = entity.getComponent("position");
+
+		//Update the lightsource
+		var newLight = this.clear().concat(this.calculate(lightSourceComponent, positionComponent.position));
+
+		//Update the tiles on the map with the new light levels
+		for(var l = 0; l < newLight.length; l++) {
+
+			this.game.map.tiles[newLight[l].x][newLight[l].y].lightLevel = newLight[l].lightLevel;
+			this.game.map.tiles[newLight[l].x][newLight[l].y].explored = true;
+
+		}
+
+	},
+
+	/**
+	 * Function that checks if a tile blocks light or not
+	 * @protected
+	 *
+	 * @param {Number} x - The X position of the tile
+	 * @param {Number} y - The Y position of the tile
+	 *
+	 * @return {Boolean} True when the tile does block light, false when the tile doesn't block light
+	 */
+	doesTileBlock: function(x, y) {
+
+		return this.game.map.tiles[x][y].blockLight;
+
+	},
+
+	/**
+	 * Function to calculate a new octant
+	 * @protected
+	 */
+	calculateOctant: function(position, row, start, end, lightsource, xx, xy, yx, yy, id) {
+
+		this.tiles.push({
+			x: position.x,
+			y: position.y,
+			lightLevel: 0
+		});
+
+		var newStart = 0;
+
+		if(start < end){
+			return;
+		}
+
+		var radiusSquared = lightsource.radius * lightsource.radius;
+
+		for(var i = row; i < lightsource.radius + 1; i++) {
+			var dx = -i - 1;
+			var dy = -i;
+
+			var blocked = false;
+
+			while(dx <= 0) {
+
+				dx += 1;
+
+				var X = position.x + dx * xx + dy * xy;
+				var Y = position.y + dx * yx + dy * yy;
+
+				if(X < this.mapSize.x && X >= 0 && Y < this.mapSize.y && Y >= 0) {
+
+					var lSlope = (dx - 0.5) / (dy + 0.5);
+					var rSlope = (dx + 0.5) / (dy - 0.5);
+
+					if(start < rSlope) {
+						continue;
+					}else if(end > lSlope) {
+						break;
+					}else{
+						if(dx * dx + dy * dy < radiusSquared) {
+							var pos1 = new Vector2(X, Y);
+							var pos2 = position;
+							var d = (pos1.x - pos2.x) * (pos1.x - pos2.x) + (pos1.y - pos2.y) * (pos1.y - pos2.y);
+
+							this.tiles.push({
+								x: X,
+								y: Y,
+								lightLevel: (lightsource.gradient === false) ? 1 : (1 - (d / (lightsource.radius * lightsource.radius)))
+							});
+						}
+
+						if(blocked) {
+							if(this.doesTileBlock(X, Y)) {
+								newStart = rSlope;
+								continue;
+							}else{
+								blocked = false;
+								start = newStart;
+							}
+						}else{
+							if(this.doesTileBlock(X, Y) && i < lightsource.radius) {
+								blocked = true;
+								this.calculateOctant(position, i + 1, start, lSlope, lightsource, xx, xy, yx, yy, id + 1);
+
+								newStart = rSlope;
+							}
+						}
+					}
+				}
+			}
+
+			if(blocked){
+				break;
+			}
+
+		}
+
+	},
+
+	/**
+	 * Sets flag lit to false on all tiles within radius of position specified
+	 * @protected
+	 *
+	 * @return {Array} An empty array
+	 */
+	clear: function() {
+
+		var i = this.tiles.length;
+		while(i--) {
+			this.tiles[i].lightLevel = 0;
+		}
+
+		var o = this.tiles;
+		this.tiles = [];
+		return o;
+
+	},
+
+	/**
+	 * Calculate the new lightning from this lightsource
+	 * @protected
+	 *
+	 * @param {LightSource} lightSource - The lightsource that is being calculated
+	 * @param {Position} position - The position of the lightsource
+	 *
+	 * @return {Array} An array containing all tiles
+	 */
+	calculate: function(lightSource, position) {
+
+		for(var i = 0; i < 8; i++) {
+
+			this.calculateOctant(position, 1, 1.0, 0.0, lightSource,
+				this.mult[0][i], this.mult[1][i], this.mult[2][i], this.mult[3][i], 0);
+
+		}
+
+		//Push this tile and it's light level's in the tiles array
+		this.tiles.push({
+			x: position.x,
+			y: position.y,
+			lightLevel: 1
+		});
+
+		//Return the tiles
+		return this.tiles;
+	}
+
+};
+
+//Export the Browserify module
+module.exports = LightMap;
+
+},{"../../geometry/vector2.js":30}],25:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+/**
+ * Movement System constructor
+ *
+ * @class Movement
+ * @classdesc The movement system is responsible for handling collision between entities and moving them
+ *
+ * @param {Game} game - Reference to the currently running game
+ */
+var Movement = function(game) {
+
+	/**
+	 * @property {Game} game - Reference to the current game object
+	 */
+	this.game = game;
+
+};
+
+Movement.prototype = {
+
+	/**
+	 * Performs the needed operations for this specific system on one entity
+	 * @protected
+	 *
+	 * @param {Entity} entity - The entity that is being processed by this system
+	 * @param {Object} newPosition - The new x or y coordinates the entity is trying to move to
+	 */
+	handleSingleEntity: function(entity, newPosition) {
+
+		//Check if the sprite needs to be flipped
+		if(entity.hasComponent("sprite")) {
+
+			this.changeDirection(entity, newPosition);
+
+		}
+
+		//Check if the new position is correct
+		if(this.canMove(entity, newPosition)) {
+
+			//Get components
+			var positionComponent = entity.getComponent("position");
+
+			//Get the tile to which the entity is trying to move
+			var currentTile = this.game.map.tiles[positionComponent.position.x][positionComponent.position.y];
+			var nextTile = this.game.map.tiles[newPosition.x][newPosition.y];
+
+			//Remove the entity from the tile it's currently on
+			currentTile.removeEntity(entity);
+
+			//And add him to the next tile that he is going to be on
+			nextTile.addEntity(entity);
+
+			//Pop the new position from the "stack"
+			positionComponent.position = newPosition;
+
+		}
+
+	},
+
+	/**
+	 * Changes the direction of a sprite based on it's new position
+	 * This way a sprite can face left or right based on it's movement
+	 * @protected
+	 *
+	 * @param {Entity} entity - The entity that is being processed by this system
+	 * @param {Object} newPosition - The new x or y coordinates the entity is trying to move to
+	 */
+	changeDirection: function(entity, newPosition) {
+
+		//Get components
+		var positionComponent = entity.getComponent("position");
+		var spriteComponent = entity.getComponent("sprite");
+
+		//Check if the entity moved left or right
+		if(newPosition.x > positionComponent.position.x) {
+
+			//The entity moved right
+			spriteComponent.direction = "right";
+
+		}else if(newPosition.x < positionComponent.position.x) {
+
+			//The entity moved left
+			spriteComponent.direction = "left";
+
+		}
+
+	},
+
+	/**
+	 * Function that gets called when an entity wants to move
+	 * @protected
+	 *
+	 * @param {Entity} entity - The entity that is being checked against the map
+	 * @param {Object} newPosition - The new position the entity is trying to move to
+	 *
+	 * @return {Boolean} True when an entity can move to the new position, false when the entity is obstructed
+	 */
+	canMove: function(entity, newPosition) {
+
+		//Get the tile to which the entity is trying to move
+		var nextTile = this.game.map.tiles[newPosition.x][newPosition.y];
+
+		//Check for collision on the map, walls etc
+		if(nextTile.type !== 2) {
+
+			return false;
+
+		}
+
+		//Check if there is one or more than one entity at the new location
+		if(nextTile.entities.length !== 0) {
+
+			//Define variables
+			var canContinue = true;
+
+			//Loop through the entities
+			for(var i = 0; i < nextTile.entities.length; i++) {
+
+				//Check if the entity has a collide component
+				if(nextTile.entities[i].hasComponent("collide")) {
+
+					//Get the collide component
+					var collideComponent = nextTile.entities[i].getComponent("collide");
+
+					//If collide is true, it means we can't walk to the next tile
+					if(collideComponent.collide === true) {
+
+						canContinue = false;
+
+					}
+
+				}
+
+				//Loop through the components
+				for(var key in nextTile.entities[i].components) {
+
+					//Make sure that obj[key] belongs to the object and was not inherited
+					if (nextTile.entities[i].components.hasOwnProperty(key)) {
+
+						//Check if the entity still exists
+						if(typeof nextTile.entities[i] === "undefined") {
+
+							//The entity could have died in a previous bumpInto event
+							//Thus we should abort the loop of the entity no longer exists
+							break;
+
+						}
+
+						//Check if the component has an events parameter
+						if(typeof nextTile.entities[i].components[key].events !== "undefined") {
+
+							//Trigger the specified event
+							nextTile.entities[i].components[key].events.trigger("bumpInto", entity, nextTile.entities[i]);
+
+						}
+
+					}
+
+				}
+
+			}
+
+			//If there was even one entity that we couldn't collide with on the next tile
+			//this will return false
+			return canContinue;
+
+		}
+
+		//Function made it all the way down here, that means the entity is able to move to the new position
+		return true;
+
+	}
+
+};
+
+//Export the Browserify module
+module.exports = Movement;
+
+},{}],26:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+/**
+ * Open System constructor
+ *
+ * @class Open
+ * @classdesc The Open system handles opening entities and making sure the collision is turned of after they are opened
+ *
+ * @param {Game} game - Reference to the currently running game
+ */
+var Open = function(game) {
+
+	/**
+	 * @property {Game} game - Reference to the current game object
+	 */
+	this.game = game;
+
+};
+
+Open.prototype = {
+
+	/**
+	 * Performs the needed operations for this specific system on one entity
+	 * @protected
+	 *
+	 * @param {Entity} entity - The entity that is being processed by this system
+	 */
+	handleSingleEntity: function(entity) {
+
+		//Get the components from the current entity and store them temporarily in a variable
+		var canOpenComponent = entity.getComponent("canOpen");
+		var spriteComponent = entity.getComponent("sprite");
+		var positionComponent = entity.getComponent("position");
+		var collideComponent = entity.getComponent("collide");
+		var tooltipComponent = entity.getComponent("tooltip");
+
+		//Action to open the door
+		if(canOpenComponent.state !== "open") {
+
+			//Change the door's state to open
+			canOpenComponent.state = "open";
+
+			//Change the sprite to open
+			spriteComponent.tile += 1;
+
+			//Make sure the collide component doesn't say it collides anymore
+			collideComponent.collide = false;
+
+			tooltipComponent.type = ["Open"];
+
+			//Make sure the tile that this openable entity is on doesn't block light anymore
+			this.game.map.tiles[positionComponent.position.x][positionComponent.position.y].blockLight = false;
+
+		}
+
+	}
+
+};
+
+//Export the Browserify module
+module.exports = Open;
+
+
+},{}],27:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+//Require necessary modules
+var EasyStar = require('../../libraries/easystar.js'),
+    Vector2 = require('../../geometry/vector2.js');
+
+/**
+ * PathFinding System constructor
+ *
+ * @class PathFinding
+ * @classdesc The system that handles pathfinding calculates new routes for entities with a certain behaviour
+ *
+ * @param {Game} game - Reference to the currently running game
+ */
+var PathFinding = function(game) {
+
+	/**
+	 * @property {Game} game - Reference to the current game object
+	 */
+	this.game = game;
+
+	/**
+	 * @property {EasyStar} easyStar - Reference to the EasyStar library
+	 */
+	this.easystar = null;
+
+	//Initialize itself
+	this.initialize();
+
+};
+
+PathFinding.prototype = {
+
+	/**
+	 * Initialize the game, create all objects
+	 * @protected
+	 */
+	initialize: function() {
+
+		//Create a new instance of the EasyStar library
+		this.easystar = new EasyStar.js();
+
+		//Implement the grid in EasyStar
+		this.easystar.setGrid(this.game.map.typeList());
+
+		//Disable diagonals
+		//TODO: Enable diagonal movement and make sure the player can also move diagonal
+		this.easystar.disableDiagonals();
+
+
+	},
+
+	/**
+	 * Performs the needed operations for this specific system on one entity
+	 * @protected
+	 *
+	 * @param {Entity} entity - The entity that is being processed by this system
+	 * @param {Array} acceptableTiles - The entity is able to walk on the tiles in this array
+	 */
+	handleSingleEntity: function(entity, acceptableTiles) {
+
+		//Set the acceptable tiles to walk on
+		this.easystar.setAcceptableTiles(acceptableTiles);
+
+		//Get the components from the current entity and store them temporarily in a variable
+		var positionComponent = entity.getComponent("position");
+
+		//TODO: Make this dynamic, not every enemy should chase the player
+		var behaviour = "attack";
+
+		//Check the behaviour of the entity
+		switch(behaviour) {
+
+			case("attack"):
+
+				//Get the player
+				var player = this.game.player;
+				var playerPositionComponent = player.getComponent("position");
+
+				//Tile at position
+				var tileAtPos = this.game.map.getTileAt(positionComponent.position);
+
+				//If the entity is in the visible area of the player, it should act
+				if(tileAtPos.lightLevel > 0.7) {
+
+					//Let EasyStar calculate a path towards the player find a path
+					this.easystar.findPath(
+
+						//Find a path from
+						positionComponent.position.x,
+						positionComponent.position.y,
+
+						//Find a path to
+						playerPositionComponent.position.x,
+						playerPositionComponent.position.y,
+
+						//Callback function
+						this.findPathHandler.bind(this, entity)
+
+					);
+
+					//Calculate the path
+					this.easystar.calculate();
+
+				}
+
+				break;
+
+		}
+
+	},
+
+	/**
+	 * Function that handles the result of the EasyStar findPath function
+	 * @protected
+	 *
+	 * @param {Entity} entity - The entity that is being processed by this system
+	 * @param {Array} path - An array with in each position an object with the next position of the path
+	 */
+	findPathHandler: function(entity, path) {
+
+		//TODO: Make sure enemies don't kill eachother, they have to find another route or collaborate
+		if(path === null || path.length === 0) {
+
+			console.log("no path found");
+
+		}else{
+
+			//Create a new Vector2 object of the new position
+			var newPosition = new Vector2(path[1].x, path[1].y);
+
+			//Tell the movement system that you want to move to the new position
+			this.game.staticSystems.movementSystem.handleSingleEntity(entity, newPosition);
+
+		}
+
+	}
+
+};
+
+//Export the Browserify module
+module.exports = PathFinding;
+
+
+
+},{"../../geometry/vector2.js":30,"../../libraries/easystar.js":35}],28:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+//Require necessary modules
+var Vector2 = require('../../geometry/vector2.js');
+
+/**
+ * Render System constructor
+ *
+ * @class Render
+ * @classdesc The renderer draws entities onto the screen
+ *
+ * @param {Game} game - Reference to the currently running game
+ */
+var Render = function(game) {
+
+	/**
+	 * @property {Game} game - Reference to the current game object
+	 */
+	this.game = game;
+
+	/**
+	 * @property {Object} canvas - Reference to the canvas object everything is drawn on
+	 */
+	this.canvas = null;
+
+	/**
+	 * @property {Object} context - The 2D context of the current canvas object
+	 */
+	this.context = null;
+
+	/**
+	 * @property {Object} mousePos - Object with x and y coordinate of the cursor on the canvas
+	 */
+	this.mousePos = null;
+
+	//Initialize itself
+	this.initialize();
+
+};
+
+Render.prototype = {
+
+	/**
+	 * The 'constructor' for this component
+	 * Gets that canvas object and it's 2D context
+	 * @protected
+	 */
+	initialize: function() {
+
+		//Get the canvas object from the games settings
+		this.canvas = this.game.settings.canvas;
+
+		//Define the context to draw on
+		this.context = this.game.settings.canvas.getContext("2d");
+
+		//Add the mouse move event listener to the canvas to always have the mouse position stored
+		this.canvas.addEventListener("mousemove", this.getMousePointer.bind(this));
+
+		//Disable image smoothing with some very ugly browser specific code
+		//TODO: Check again in 10 years if there are better solutions to this
+		this.context.mozImageSmoothingEnabled = false;
+		this.context.webkitImageSmoothingEnabled = false;
+		this.context.msImageSmoothingEnabled = false;
+		this.context.imageSmoothingEnabled = false;
+
+	},
+
+	/**
+	 * Function that gets called when the game continues one tick
+	 * @protected
+	 */
+	update: function() {
+
+		//Update the camera
+		//TODO: Move this outta here!
+		this.game.camera.update();
+
+		//Clear the canvas and draw the map
+		this.clear();
+		this.drawMap();
+
+		//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
+		var entities = this.game.map.entities.getEntities("position", "sprite");
+
+		//Save the context to push a copy of our current drawing state onto our drawing state stack
+		this.context.save();
+
+		//Loop through all matching entities
+		for(var i = 0; i < entities.length; i++) {
+
+			//Perform the needed operations for this specific system on one entity
+			this.handleSingleEntity(entities[i]);
+
+		}
+
+		//Pop the last saved drawing state off of the drawing state stack
+		this.context.restore();
+
+		//Draw the lightmap
+		this.drawLightMap();
+
+		//Draw the UI
+		this.drawMousePointer();
+		this.drawUI();
+
+	},
+
+	/**
+	 * Performs the needed operations for this specific system on one entity
+	 * @protected
+	 *
+	 * @param {Entity} entity - The entity that is being processed by this system
+	 */
+	handleSingleEntity: function(entity) {
+
+		//Define variables
+		var map = this.game.map;
+		var camera = this.game.camera;
+
+		//Get the components from the current entity and store them temporarily in a variable
+		var spriteComponent = entity.getComponent("sprite");
+		var positionComponent = entity.getComponent("position");
+
+		//TODO: Use a preloader and only get the file once, not every frame T__T
+		var img = document.getElementById(spriteComponent.sprite);
+
+		//Draw the sprite of this entity on the canvas
+		this.context.drawImage(
+			img,
+			spriteComponent.getTileNumber() * 16,
+			spriteComponent.row * 16,
+			16,
+			16,
+			(positionComponent.position.x * map.settings.tileSize) - camera.position.x + spriteComponent.offset.x,
+			(positionComponent.position.y * map.settings.tileSize) - camera.position.y + spriteComponent.offset.y,
+			map.settings.tileSize,
+			map.settings.tileSize
+		);
+
+		//If the entity has health, draw a healthbar
+		if(entity.hasComponent("health")) {
+
+			//Get the components
+			var healthComponent = entity.getComponent("health");
+
+			if(healthComponent.isDamaged()) {
+
+				this.context.fillStyle = "red";
+
+				//Create the object ( just a rectangle for now )!
+				this.context.fillRect(
+					(positionComponent.position.x * map.settings.tileSize) - camera.position.x,
+					(positionComponent.position.y * map.settings.tileSize) - camera.position.y,
+					map.settings.tileSize * healthComponent.percentage(),
+					5
+				);
+
+
+			}
+
+		}
+	},
+
+	/**
+	 * Draw the current map onto the canvas
+	 * @protected
+	 */
+	drawMap: function() {
+
+		//Define variables
+		var map = this.game.map;
+		var camera = this.game.camera;
+
+		//TODO: Use a preloader and only get the file once, not every frame
+		var tileSet = document.getElementById("tileset");
+
+		//Save the context to push a copy of our current drawing state onto our drawing state stack
+		this.context.save();
+
+		//Loop through every horizontal row
+		//TODO: Only draw tiles that are visible within the camera
+		for(var x = 0; x < map.settings.tilesX; x++) {
+
+			//Loop through every vertical row
+			for(var y = 0; y < map.settings.tilesY; y++) {
+
+				//Get the type of the current tile
+				var tileRow = map.tiles[x][y].tileRow;
+				var tileNumber = map.tiles[x][y].tileNumber;
+
+				this.context.drawImage(
+					tileSet,
+					tileNumber * 16,
+					tileRow * 16,
+					16,
+					16,
+					(x * map.settings.tileSize) - Math.round(camera.position.x),
+					(y * map.settings.tileSize) - Math.round(camera.position.y),
+					map.settings.tileSize,
+					map.settings.tileSize
+				);
+
+			}
+
+		}
+
+		//Pop the last saved drawing state off of the drawing state stack
+		this.context.restore();
+
+	},
+
+	/**
+	 * Draw the current lightmap onto the canvas
+	 * @protected
+	 */
+	drawLightMap: function() {
+
+		//Define variables
+		var map = this.game.map;
+		var camera = this.game.camera;
+
+		//Save the context to push a copy of our current drawing state onto our drawing state stack
+		this.context.save();
+
+		//Loop through every horizontal row
+		for(var x = 0; x < map.settings.tilesX; x++) {
+
+			//Loop through every vertical row
+			for(var y = 0; y < map.settings.tilesY; y++) {
+
+				//Draw the lightmap
+				if(map.tiles[x][y].explored === true && 1 - map.tiles[x][y].lightLevel > 0.7) {
+
+					this.context.fillStyle = "rgba(0, 0, 0, 0.7)";
+
+				}else{
+
+					this.context.fillStyle = "rgba(0, 0, 0, " + (1 - map.tiles[x][y].lightLevel) + ")";
+
+				}
+
+				//Create a rectangle!
+				this.context.fillRect(
+					//Get the current position of the tile, and check where it is in the camera's viewport
+					(x * map.settings.tileSize) - Math.round(camera.position.x),
+					(y * map.settings.tileSize) - Math.round(camera.position.y),
+					map.settings.tileSize,
+					map.settings.tileSize
+				);
+
+			}
+
+		}
+
+		//Pop the last saved drawing state off of the drawing state stack
+		this.context.restore();
+
+	},
+
+	/**
+	 * Draw the UI on top of everything
+	 * @protected
+	 */
+	drawMousePointer: function() {
+
+		//Define variables
+		var map = this.game.map;
+		var camera = this.game.camera;
+
+		//TODO: Use a preloader and only get the file once, not every frame
+		var img = document.getElementById("ui");
+
+		//If the mouse position isn't set, stop right here
+		if(this.mousePos === null) {
+			return;
+		}
+
+		//Calculate the offset of the camera, how many pixels are left at the left and top of the screen
+		var cameraXOffset = camera.position.x % map.settings.tileSize;
+		var cameraYOffset = camera.position.y % map.settings.tileSize;
+
+		//Calculate at which tile the mouse is currently pointing relative to the camera
+		var tileXRel = Math.floor((this.mousePos.x + cameraXOffset) / map.settings.tileSize);
+		var tileYRel = Math.floor((this.mousePos.y + cameraYOffset) / map.settings.tileSize);
+
+		//Calculate at which tile the mouse is currently pointing absolute to the camera
+		var tileXAbs = Math.floor((this.mousePos.x + camera.position.x) / map.settings.tileSize);
+		var tileYAbs = Math.floor((this.mousePos.y + camera.position.y) / map.settings.tileSize);
+
+		//Create a new Vector2 object of the tile's position
+		var tilePosition = new Vector2(tileXAbs, tileYAbs);
+
+		//If the tile that the mouse is pointing at is not within the map, quit here
+		if(!map.insideBounds(tilePosition)) {
+			return;
+		}
+
+		//Get the tile at the mouse position
+		var tile = map.getTileAt(tilePosition);
+
+		//If the tile isn't a floor tile, you can't walk there so why bother showing the mouse pointer
+		//Also don't show the mouse pointer if you haven't explored the tile yet
+		if(tile.type !== 2 || !tile.explored) {
+			return;
+		}
+
+		//TODO: Clean up the entire next section, code is very large and could be done a lot better
+
+		//Draw the sprite of the mouse pointer on the canvas
+		this.context.drawImage(
+			img,
+			0,
+			0,
+			16,
+			16,
+			tileXRel * map.settings.tileSize - cameraXOffset,
+			tileYRel * map.settings.tileSize - cameraYOffset,
+			map.settings.tileSize,
+			map.settings.tileSize
+		);
+
+		//Check if there are entities at the tile
+		if(tile.entities.length === 0) {
+			return;
+		}
+
+		//Get the lats entity
+		var lastEntity = tile.entities[tile.entities.length - 1];
+
+		if(lastEntity.hasComponent("tooltip")) {
+
+			//Get the components
+			var tooltipComponent = lastEntity.getComponent("tooltip");
+
+			//Determine what the lineHeight is
+			var lineHeight = (tooltipComponent.fontSize + 5);
+
+			//Draw a rectangle underneath the text
+			this.context.fillStyle = "rgba(0, 0, 0, 0.7)";
+
+			//Create a rectangle!
+			this.context.fillRect(
+				//Get the current position of the tile, and check where it is in the camera's viewport
+				this.mousePos.x + 5,
+				this.mousePos.y + 10,
+				tooltipComponent.maxWidth + 20,
+				lineHeight * (tooltipComponent.title.length + tooltipComponent.type.length + tooltipComponent.description.length) + 20
+			);
+
+			//Start by drawing on line number 0, this value will get incremented every new line
+			var currentPos = 0;
+
+			//Draw the tooltips title
+			for(var t = 0; t < tooltipComponent.title.length; t++) {
+
+				this.context.font = "bold " + tooltipComponent.fontSize + "px " + tooltipComponent.font;
+				this.context.fillStyle = "rgba(255, 255, 255, 1)";
+
+				//Draw the title on screen
+				this.context.fillText(
+					tooltipComponent.title[t],
+					this.mousePos.x + 15,
+					this.mousePos.y + 15 + lineHeight + (lineHeight * currentPos)
+				);
+
+				//Continue drawing on the next line
+				currentPos++;
+
+			}
+
+			//Draw the tooltips type
+			for(var y = 0; y < tooltipComponent.type.length; y++) {
+
+				this.context.font = tooltipComponent.fontSize + "px " + tooltipComponent.font;
+				this.context.fillStyle = "rgba(255, 255, 200, 1)";
+
+				//Draw the title on screen
+				this.context.fillText(
+					tooltipComponent.type[y],
+					this.mousePos.x + 15,
+					this.mousePos.y + 15 + lineHeight + (lineHeight * currentPos)
+				);
+
+				//Continue drawing on the next line
+				currentPos++;
+
+			}
+
+			//Draw the tooltips description
+			for(var i = 0; i < tooltipComponent.description.length; i++) {
+
+				//Set the current fontsize to the context of the canvas
+				this.context.font = tooltipComponent.fontSize + "px " + tooltipComponent.font;
+				this.context.fillStyle = "rgba(180, 180, 180, 1)";
+
+				//Draw the description on screen
+				this.context.fillText(
+					tooltipComponent.description[i],
+					this.mousePos.x + 15,
+					this.mousePos.y + 15 + lineHeight + (lineHeight * currentPos)
+				);
+
+				//Continue drawing on the next line
+				currentPos++;
+
+			}
+
+
+		}
+
+	},
+
+	/**
+	 * Starts the drawing of the UI by calling the render function of the global UI container
+	 * @protected
+	 */
+	drawUI: function() {
+
+		//Provide the canvas context and a starting position of 0,0 in the top left
+		this.game.UI.render(this.context, new Vector2(0, 0));
+
+	},
+
+	/**
+	 * Get the position of the mouse on the canvas and store it for later use
+	 * @protected
+	 */
+	getMousePointer: function(event) {
+
+		//Get the rectangle from the canvas
+		var rect = this.canvas.getBoundingClientRect();
+
+		//Calculate the mouse position
+		this.mousePos = {
+			x: event.clientX - rect.left,
+			y: event.clientY - rect.top
+		};
+
+	},
+
+	/**
+	 * Function to clear the canvas
+	 * @protected
+	 */
+	clear: function() {
+
+		//Clear the entire canvas
+		this.context.clearRect(0, 0, this.game.settings.canvas.width, this.game.settings.canvas.height);
+
+	}
+
+};
+
+//Export the Browserify module
+module.exports = Render;
+
+
+},{"../../geometry/vector2.js":30}],29:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -1097,7 +3508,7 @@ Boundary.prototype = {
 //Export the Browserify module
 module.exports = Boundary;
 
-},{}],9:[function(require,module,exports){
+},{}],30:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -1218,7 +3629,7 @@ Vector2.prototype = {
 //Export the Browserify module
 module.exports = Vector2;
 
-},{}],10:[function(require,module,exports){
+},{}],31:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -1262,7 +3673,7 @@ window.addEventListener("load", Intialize);
 //Export the Browserify module
 module.exports = Intialize;
 
-},{"./core/game.js":2}],11:[function(require,module,exports){
+},{"./core/game.js":2}],32:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -1360,7 +3771,7 @@ Event.prototype = {
 //Export the Browserify module
 module.exports = Event;
 
-},{}],12:[function(require,module,exports){
+},{}],33:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -1476,7 +3887,7 @@ Key.prototype = {
 //Export the Browserify module
 module.exports = Key;
 
-},{"./event.js":11}],13:[function(require,module,exports){
+},{"./event.js":32}],34:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -1594,7 +4005,557 @@ Keyboard.prototype = {
 module.exports = Keyboard;
 
 
-},{"./key.js":12}],14:[function(require,module,exports){
+},{"./key.js":33}],35:[function(require,module,exports){
+//NameSpace
+var EasyStar = EasyStar || {};
+
+/**
+ * A simple Node that represents a single tile on the grid.
+ * @param {Object} parent The parent node.
+ * @param {Number} x The x position on the grid.
+ * @param {Number} y The y position on the grid.
+ * @param {Number} costSoFar How far this node is in moves*cost from the start.
+ * @param {Number} simpleDistanceToTarget Manhatten distance to the end point.
+ **/
+EasyStar.Node = function(parent, x, y, costSoFar, simpleDistanceToTarget) {
+	this.parent = parent;
+	this.x = x;
+	this.y = y;
+	this.costSoFar = costSoFar;
+	this.simpleDistanceToTarget = simpleDistanceToTarget;
+
+	/**
+	 * @return {Number} Best guess distance of a cost using this node.
+	 **/
+	this.bestGuessDistance = function() {
+		return this.costSoFar + this.simpleDistanceToTarget;
+	}
+};
+
+//Constants
+EasyStar.Node.OPEN_LIST = 0;
+EasyStar.Node.CLOSED_LIST = 1;
+/**
+ * This is an improved Priority Queue data type implementation that can be used to sort any object type.
+ * It uses a technique called a binary heap.
+ *
+ * For more on binary heaps see: http://en.wikipedia.org/wiki/Binary_heap
+ *
+ * @param {String} criteria The criteria by which to sort the objects.
+ * This should be a property of the objects you're sorting.
+ *
+ * @param {Number} heapType either PriorityQueue.MAX_HEAP or PriorityQueue.MIN_HEAP.
+ **/
+EasyStar.PriorityQueue = function(criteria, heapType) {
+	this.length = 0; //The current length of heap.
+	var queue = [];
+	var isMax = false;
+
+	//Constructor
+	if(heapType == EasyStar.PriorityQueue.MAX_HEAP) {
+		isMax = true;
+	}else if(heapType == EasyStar.PriorityQueue.MIN_HEAP) {
+		isMax = false;
+	}else{
+		throw heapType + " not supported.";
+	}
+
+	/**
+	 * Inserts the value into the heap and sorts it.
+	 *
+	 * @param value The object to insert into the heap.
+	 **/
+	this.insert = function(value) {
+		if(!value.hasOwnProperty(criteria)) {
+			throw "Cannot insert " + value + " because it does not have a property by the name of " + criteria + ".";
+		}
+		queue.push(value);
+		this.length++;
+		bubbleUp(this.length - 1);
+	}
+
+	/**
+	 * Peeks at the highest priority element.
+	 *
+	 * @return the highest priority element
+	 **/
+	this.getHighestPriorityElement = function() {
+		return queue[0];
+	}
+
+	/**
+	 * Removes and returns the highest priority element from the queue.
+	 *
+	 * @return the highest priority element
+	 **/
+	this.shiftHighestPriorityElement = function() {
+		if(this.length === 0) {
+			throw ("There are no more elements in your priority queue.");
+		}else if(this.length === 1) {
+			var onlyValue = queue[0];
+			queue = [];
+			this.length = 0;
+			return onlyValue;
+		}
+		var oldRoot = queue[0];
+		var newRoot = queue.pop();
+		this.length--;
+		queue[0] = newRoot;
+		swapUntilQueueIsCorrect(0);
+		return oldRoot;
+	}
+
+	var bubbleUp = function(index) {
+		if(index === 0) {
+			return;
+		}
+		var parent = getParentOf(index);
+		if(evaluate(index, parent)) {
+			swap(index, parent);
+			bubbleUp(parent);
+		}else{
+			return;
+		}
+	}
+
+	var swapUntilQueueIsCorrect = function(value) {
+		left = getLeftOf(value);
+		right = getRightOf(value);
+		if(evaluate(left, value)) {
+			swap(value, left);
+			swapUntilQueueIsCorrect(left);
+		}else if(evaluate(right, value)) {
+			swap(value, right);
+			swapUntilQueueIsCorrect(right);
+		}else if(value == 0) {
+			return;
+		}else{
+			swapUntilQueueIsCorrect(0);
+		}
+	}
+
+	var swap = function(self, target) {
+		var placeHolder = queue[self];
+		queue[self] = queue[target];
+		queue[target] = placeHolder;
+	}
+
+	var evaluate = function(self, target) {
+		if(queue[target] === undefined || queue[self] === undefined) {
+			return false;
+		}
+
+		//Check if the criteria should be the result of a function call.
+		if(typeof queue[self][criteria] === 'function') {
+			selfValue = queue[self][criteria]();
+			targetValue = queue[target][criteria]();
+		}else{
+			selfValue = queue[self][criteria];
+			targetValue = queue[target][criteria];
+		}
+
+		if(isMax) {
+			if(selfValue > targetValue) {
+				return true;
+			}else{
+				return false;
+			}
+		}else{
+			if(selfValue < targetValue) {
+				return true;
+			}else{
+				return false;
+			}
+		}
+	}
+
+	var getParentOf = function(index) {
+		return Math.floor(index / 2) - 1;
+	}
+
+	var getLeftOf = function(index) {
+		return index * 2 + 1;
+	}
+
+	var getRightOf = function(index) {
+		return index * 2 + 2;
+	}
+};
+
+//Constants
+EasyStar.PriorityQueue.MAX_HEAP = 0;
+EasyStar.PriorityQueue.MIN_HEAP = 1;
+/**
+ * Represents a single instance of EasyStar.
+ * A path that is in the queue to eventually be found.
+ */
+EasyStar.instance = function() {
+	this.isDoneCalculating = true;
+	this.pointsToAvoid = {};
+	this.startX;
+	this.callback;
+	this.startY;
+	this.endX;
+	this.endY;
+	this.nodeHash = {};
+	this.openList;
+};
+/**
+ *     EasyStar.js
+ *     github.com/prettymuchbryce/EasyStarJS
+ *     Licensed under the MIT license.
+ *
+ *     Implementation By Bryce Neal (@prettymuchbryce)
+ **/
+EasyStar.js = function() {
+	var STRAIGHT_COST = 10;
+	var DIAGONAL_COST = 14;
+	var pointsToAvoid = {};
+	var collisionGrid;
+	var costMap = {};
+	var iterationsSoFar;
+	var instances = [];
+	var iterationsPerCalculation = Number.MAX_VALUE;
+	var acceptableTiles;
+	var diagonalsEnabled = false;
+
+	/**
+	 * Sets the collision grid that EasyStar uses.
+	 *
+	 * @param {Array|Number} tiles An array of numbers that represent
+	 * which tiles in your grid should be considered
+	 * acceptable, or "walkable".
+	 **/
+	this.setAcceptableTiles = function(tiles) {
+		if(tiles instanceof Array) {
+			//Array
+			acceptableTiles = tiles;
+		}else if(!isNaN(parseFloat(tiles)) && isFinite(tiles)) {
+			//Number
+			acceptableTiles = [tiles];
+		}
+	};
+
+	/**
+	 * Enable diagonal pathfinding.
+	 */
+	this.enableDiagonals = function() {
+		diagonalsEnabled = true;
+	}
+
+	/**
+	 * Disable diagonal pathfinding.
+	 */
+	this.disableDiagonals = function() {
+		diagonalsEnabled = false;
+	}
+
+	/**
+	 * Sets the collision grid that EasyStar uses.
+	 *
+	 * @param {Array} grid The collision grid that this EasyStar instance will read from.
+	 * This should be a 2D Array of Numbers.
+	 **/
+	this.setGrid = function(grid) {
+		collisionGrid = grid;
+
+		//Setup cost map
+		for(var y = 0; y < collisionGrid.length; y++) {
+			for(var x = 0; x < collisionGrid[0].length; x++) {
+				if(!costMap[collisionGrid[y][x]]) {
+					costMap[collisionGrid[y][x]] = 1
+				}
+			}
+		}
+	};
+
+	/**
+	 * Sets the tile cost for a particular tile type.
+	 *
+	 * @param {Number} The tile type to set the cost for.
+	 * @param {Number} The multiplicative cost associated with the given tile.
+	 **/
+	this.setTileCost = function(tileType, cost) {
+		costMap[tileType] = cost;
+	};
+
+	/**
+	 * Sets the number of search iterations per calculation.
+	 * A lower number provides a slower result, but more practical if you
+	 * have a large tile-map and don't want to block your thread while
+	 * finding a path.
+	 *
+	 * @param {Number} iterations The number of searches to prefrom per calculate() call.
+	 **/
+	this.setIterationsPerCalculation = function(iterations) {
+		iterationsPerCalculation = iterations;
+	};
+
+	/**
+	 * Avoid a particular point on the grid,
+	 * regardless of whether or not it is an acceptable tile.
+	 *
+	 * @param {Number} x The x value of the point to avoid.
+	 * @param {Number} y The y value of the point to avoid.
+	 **/
+	this.avoidAdditionalPoint = function(x, y) {
+		pointsToAvoid[x + "_" + y] = 1;
+	};
+
+	/**
+	 * Stop avoiding a particular point on the grid.
+	 *
+	 * @param {Number} x The x value of the point to stop avoiding.
+	 * @param {Number} y The y value of the point to stop avoiding.
+	 **/
+	this.stopAvoidingAdditionalPoint = function(x, y) {
+		delete pointsToAvoid[x + "_" + y];
+	};
+
+	/**
+	 * Stop avoiding all additional points on the grid.
+	 **/
+	this.stopAvoidingAllAdditionalPoints = function() {
+		pointsToAvoid = {};
+	};
+
+	/**
+	 * Find a path.
+	 *
+	 * @param {Number} startX The X position of the starting point.
+	 * @param {Number} startY The Y position of the starting point.
+	 * @param {Number} endX The X position of the ending point.
+	 * @param {Number} endY The Y position of the ending point.
+	 * @param {Function} callback A function that is called when your path
+	 * is found, or no path is found.
+	 *
+	 **/
+	this.findPath = function(startX, startY, endX, endY, callback) {
+		//No acceptable tiles were set
+		if(acceptableTiles === undefined) {
+			throw "You can't set a path without first calling setAcceptableTiles() on EasyStar.";
+		}
+		//No grid was set
+		if(collisionGrid === undefined) {
+			throw "You can't set a path without first calling setGrid() on EasyStar.";
+		}
+
+		//Start or endpoint outside of scope.
+		if(startX < 0 || startY < 0 || endX < 0 || endX < 0 ||
+			startX > collisionGrid[0].length - 1 || startY > collisionGrid.length - 1 ||
+			endX > collisionGrid[0].length - 1 || endY > collisionGrid.length - 1) {
+			throw "Your start or end point is outside the scope of your grid.";
+		}
+
+		//Start and end are the same tile.
+		if(startX === endX && startY === endY) {
+			callback([]);
+		}
+
+		//End point is not an acceptable tile.
+		var endTile = collisionGrid[endY][endX];
+		var isAcceptable = false;
+		for(var i = 0; i < acceptableTiles.length; i++) {
+			if(endTile === acceptableTiles[i]) {
+				isAcceptable = true;
+				break;
+			}
+		}
+
+		if(isAcceptable === false) {
+			callback(null);
+			return;
+		}
+
+		//Create the instance
+		var instance = new EasyStar.instance();
+		instance.openList = new EasyStar.PriorityQueue("bestGuessDistance", EasyStar.PriorityQueue.MIN_HEAP);
+		instance.isDoneCalculating = false;
+		instance.nodeHash = {};
+		instance.startX = startX;
+		instance.startY = startY;
+		instance.endX = endX;
+		instance.endY = endY;
+		instance.callback = callback;
+
+		instance.openList.insert(coordinateToNode(instance, instance.startX,
+			instance.startY, null, STRAIGHT_COST));
+
+		instances.push(instance);
+	};
+
+	/**
+	 * This method steps through the A* Algorithm in an attempt to
+	 * find your path(s). It will search 4 tiles for every calculation.
+	 * You can change the number of calculations done in a call by using
+	 * easystar.setIteratonsPerCalculation().
+	 **/
+	this.calculate = function() {
+		if(instances.length === 0 || collisionGrid === undefined || acceptableTiles === undefined) {
+			return;
+		}
+		for(iterationsSoFar = 0; iterationsSoFar < iterationsPerCalculation; iterationsSoFar++) {
+			if(instances.length === 0) {
+				return;
+			}
+
+			//Couldn't find a path.
+			if(instances[0].openList.length === 0) {
+				instances[0].callback(null);
+				instances.shift();
+				continue;
+			}
+
+			var searchNode = instances[0].openList.shiftHighestPriorityElement();
+			searchNode.list = EasyStar.Node.CLOSED_LIST;
+
+			if(searchNode.y > 0) {
+				checkAdjacentNode(instances[0], searchNode, 0, -1, STRAIGHT_COST *
+					costMap[collisionGrid[searchNode.y - 1][searchNode.x]]);
+				if(instances[0].isDoneCalculating === true) {
+					instances.shift();
+					continue;
+				}
+			}
+			if(searchNode.x < collisionGrid[0].length - 1) {
+				checkAdjacentNode(instances[0], searchNode, 1, 0, STRAIGHT_COST *
+					costMap[collisionGrid[searchNode.y][searchNode.x + 1]]);
+				if(instances[0].isDoneCalculating === true) {
+					instances.shift();
+					continue;
+				}
+			}
+			if(searchNode.y < collisionGrid.length - 1) {
+				checkAdjacentNode(instances[0], searchNode, 0, 1, STRAIGHT_COST *
+					costMap[collisionGrid[searchNode.y + 1][searchNode.x]]);
+				if(instances[0].isDoneCalculating === true) {
+					instances.shift();
+					continue;
+				}
+			}
+			if(searchNode.x > 0) {
+				checkAdjacentNode(instances[0], searchNode, -1, 0, STRAIGHT_COST *
+					costMap[collisionGrid[searchNode.y][searchNode.x - 1]]);
+				if(instances[0].isDoneCalculating === true) {
+					instances.shift();
+					continue;
+				}
+			}
+			if(diagonalsEnabled) {
+				if(searchNode.x > 0 && searchNode.y > 0) {
+					checkAdjacentNode(instances[0], searchNode, -1, -1, DIAGONAL_COST *
+						costMap[collisionGrid[searchNode.y - 1][searchNode.x - 1]]);
+					if(instances[0].isDoneCalculating === true) {
+						instances.shift();
+						continue;
+					}
+				}
+				if(searchNode.x < collisionGrid[0].length - 1 && searchNode.y < collisionGrid.length - 1) {
+					checkAdjacentNode(instances[0], searchNode, 1, 1, DIAGONAL_COST *
+						costMap[collisionGrid[searchNode.y + 1][searchNode.x + 1]]);
+					if(instances[0].isDoneCalculating === true) {
+						instances.shift();
+						continue;
+					}
+				}
+				if(searchNode.x < collisionGrid[0].length - 1 && searchNode.y > 0) {
+					checkAdjacentNode(instances[0], searchNode, 1, -1, DIAGONAL_COST *
+						costMap[collisionGrid[searchNode.y - 1][searchNode.x + 1]]);
+					if(instances[0].isDoneCalculating === true) {
+						instances.shift();
+						continue;
+					}
+				}
+				if(searchNode.x > 0 && searchNode.y < collisionGrid.length - 1) {
+					checkAdjacentNode(instances[0], searchNode, -1, 1, DIAGONAL_COST *
+						costMap[collisionGrid[searchNode.y + 1][searchNode.x - 1]]);
+					if(instances[0].isDoneCalculating === true) {
+						instances.shift();
+						continue;
+					}
+				}
+			}
+		}
+	};
+
+	//Private methods follow
+
+	var checkAdjacentNode = function(instance, searchNode, x, y, cost) {
+		var adjacentCoordinateX = searchNode.x + x;
+		var adjacentCoordinateY = searchNode.y + y;
+
+		if(instance.endX === adjacentCoordinateX && instance.endY === adjacentCoordinateY) {
+			instance.isDoneCalculating = true;
+			var path = [];
+			var pathLen = 0;
+			path[pathLen] = {x: adjacentCoordinateX, y: adjacentCoordinateY};
+			pathLen++;
+			path[pathLen] = {x: searchNode.x, y: searchNode.y};
+			pathLen++;
+			var parent = searchNode.parent;
+			while(parent != null) {
+				path[pathLen] = {x: parent.x, y: parent.y};
+				pathLen++;
+				parent = parent.parent;
+			}
+			path.reverse();
+			instance.callback(path);
+		}
+
+		if(pointsToAvoid[adjacentCoordinateX + "_" + adjacentCoordinateY] === undefined) {
+			for(var i = 0; i < acceptableTiles.length; i++) {
+				if(collisionGrid[adjacentCoordinateY][adjacentCoordinateX] === acceptableTiles[i]) {
+
+					var node = coordinateToNode(instance, adjacentCoordinateX,
+						adjacentCoordinateY, searchNode, cost);
+
+					if(node.list === undefined) {
+						node.list = EasyStar.Node.OPEN_LIST;
+						instance.openList.insert(node);
+					}else if(node.list === EasyStar.Node.OPEN_LIST) {
+						if(searchNode.costSoFar + cost < node.costSoFar) {
+							node.costSoFar = searchNode.costSoFar + cost;
+							node.parent = searchNode;
+						}
+					}
+					break;
+				}
+			}
+
+		}
+	};
+
+	//Helpers
+
+	var coordinateToNode = function(instance, x, y, parent, cost) {
+		if(instance.nodeHash[x + "_" + y] !== undefined) {
+			return instance.nodeHash[x + "_" + y];
+		}
+		var simpleDistanceToTarget = getDistance(x, y, instance.endX, instance.endY);
+		if(parent !== null) {
+			var costSoFar = parent.costSoFar + cost;
+		}else{
+			costSoFar = simpleDistanceToTarget;
+		}
+		var node = new EasyStar.Node(parent, x, y, costSoFar, simpleDistanceToTarget);
+		instance.nodeHash[x + "_" + y] = node;
+		return node;
+	};
+
+	var getDistance = function(x1, x2, y1, y2) {
+		return Math.floor(Math.abs(x2 - x1) + Math.abs(y2 - y1));
+	};
+}
+if(typeof define === "function" && define.amd) {
+	define("easystar", [], function() {
+		return EasyStar;
+	});
+}
+
+//Export the Browserify module
+module.exports = EasyStar;
+
+},{}],36:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -1817,7 +4778,7 @@ MersenneTwister.prototype.genrand_res53 = function() {
 //Export the Browserify module
 module.exports = MersenneTwister;
 
-},{}],15:[function(require,module,exports){
+},{}],37:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -2058,12 +5019,16 @@ Map.prototype = {
 //Export the Browserify module
 module.exports = Map;
 
-},{"./tile.js":19}],16:[function(require,module,exports){
+},{"./tile.js":41}],38:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
 //Require necessary modules
-var PropFactory = require('../factories/propfactory.js');
+var PropFactory = require('../factories/propfactory.js'),
+    DecorationFactory = require('../factories/decorationfactory.js'),
+    EnemyFactory = require('../factories/enemyfactory.js'),
+    Vector2 = require('../geometry/vector2.js'),
+    Utils = require('../core/utils.js');
 
 /**
  * MapDecorator constructor
@@ -2466,13 +5431,14 @@ MapDecorator.prototype = {
 //Export the Browserify module
 module.exports = MapDecorator;
 
-},{"../factories/propfactory.js":5}],17:[function(require,module,exports){
+},{"../core/utils.js":4,"../factories/decorationfactory.js":5,"../factories/enemyfactory.js":6,"../factories/propfactory.js":8,"../geometry/vector2.js":30}],39:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
 //Require necessary modules
 var Room = require('./room.js'),
     Vector2 = require('../geometry/vector2.js'),
+    EnemyFactory = require('../factories/enemyfactory.js'),
     Utils = require('../core/utils.js');
 
 /**
@@ -3100,7 +6066,7 @@ MapFactory.prototype = {
 //Export the Browserify module
 module.exports = MapFactory;
 
-},{"../core/utils.js":4,"../geometry/vector2.js":9,"./room.js":18}],18:[function(require,module,exports){
+},{"../core/utils.js":4,"../factories/enemyfactory.js":6,"../geometry/vector2.js":30,"./room.js":40}],40:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -3265,7 +6231,7 @@ Room.prototype = {
 //Export the Browserify module
 module.exports = Room;
 
-},{"../core/utils.js":4,"../geometry/vector2.js":9,"./tile.js":19}],19:[function(require,module,exports){
+},{"../core/utils.js":4,"../geometry/vector2.js":30,"./tile.js":41}],41:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -3376,7 +6342,7 @@ Tile.prototype = {
 //Export the Browserify module
 module.exports = Tile;
 
-},{}],20:[function(require,module,exports){
+},{}],42:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -3542,7 +6508,7 @@ Queue.prototype = {
 module.exports = Queue;
 
 
-},{}],21:[function(require,module,exports){
+},{}],43:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -3785,4 +6751,284 @@ Scheduler.prototype = {
 //Export the Browserify module
 module.exports = Scheduler;
 
-},{"./queue.js":20}]},{},[10])
+},{"./queue.js":42}],44:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+//Require necessary modules
+var Element = require('./element.js');
+
+/**
+ * Container constructor
+ *
+ * @class Container
+ * @classdesc An object that holds certain UI elements
+ * Inherits from Element
+ *
+ * @param {Vector2} position - The position of this element
+ */
+var Container = function(position) {
+
+	/**
+	 * Inherit the constructor from the Element class
+	 */
+	Element.call(this, position);
+
+	/**
+	 * @property {Array} elements - An array that holds all UI elements
+	 */
+	this.elements = [];
+
+};
+
+Container.prototype = Object.create(Element.prototype, {
+
+	addElement: {
+
+		/**
+		 * Function to add a new element to the UI
+		 * @protected
+		 *
+		 * @param {Element || Container} element - The element that is being added to the UI
+		 */
+		value: function(element) {
+
+			//Add the element to the elements array
+			this.elements.push(element);
+
+		}
+
+	},
+
+	removeElement: {
+
+		/**
+		 * Function to remove an element from the UI
+		 * @protected
+		 *
+		 * @param {Element} element - The element that is being removed from the UI
+		 *
+		 * @return {Boolean} Returns true when the element is removed, returns false when not
+		 */
+		value: function(element) {
+
+			//Try to find the element in both element arrays
+			var index = this.elements.indexOf(element);
+
+			//If the element isn't found, exit as soon as possible
+			if(index === -1) {
+				return false;
+			}
+
+			//The element has been found
+			this.elements.splice(index, 1);
+
+			//We've made it all the way down here so the element is removed
+			return true;
+
+		}
+
+	},
+
+	render: {
+
+		/**
+		 * Calls the render function of each of the containers children
+		 * @protected
+		 *
+		 * @param {Object} context - Reference to the current canvas context
+		 * @param {Vector2} parentPosition - The position of the previous container that called this render function
+		 */
+		value: function(context, parentPosition) {
+
+			//Check if the container and it's children even need to be rendered
+			if(!this.visible){
+
+				return;
+
+			}
+
+			//Create a new starting position using the provided position and the position of this container
+			var newPosition = parentPosition.combine(this.position);
+
+			//Loop through each element in this container
+			for(var i = 0; i < this.elements.length; i++) {
+
+				//Call the render function of the current element
+				this.elements[i].render(context, newPosition);
+
+			}
+
+		}
+
+	}
+
+});
+
+//Export the Browserify module
+module.exports = Container;
+
+},{"./element.js":46}],45:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+//Require necessary modules
+var Element = require('../element.js');
+
+/**
+ * UI Element TextLog constructor
+ *
+ * @class TextLogElement
+ * @classdesc An object that is able to render messages from the textlog
+ * Inherits from Element
+ *
+ * @param {Vector2} position - The position of this element
+ * @param {Game} game - Reference to the currently running game
+ */
+var TextLogElement = function(position, game) {
+
+	/**
+	 * Inherit the constructor from the Element class
+	 */
+	Element.call(this, position);
+
+	/**
+	 * @property {Game} game - Reference to the current game object
+	 */
+	this.game = game;
+
+	/**
+	 * @property {Number} fontSize - The size of the text
+	 */
+	this.color = "rgba(255, 255, 255, 1)";
+
+	/**
+	 * @property {Number} fontSize - The size of the text
+	 */
+	this.fontSize = 12;
+
+	/**
+	 * @property {String} font - The font that the text is being rendered in
+	 */
+	this.font = "Courier New";
+
+	/**
+	 * @property {Number} maxMessages - The max amount of messages displayed in the text log
+	 */
+	this.maxMessages = 5;
+
+};
+
+TextLogElement.prototype = Object.create(Element.prototype, {
+
+	render: {
+
+		/**
+		 * Calls the render function of each of the containers children
+		 * @protected
+		 *
+		 * @param {Object} context - Reference to the current canvas context
+		 * @param {Vector2} parentPosition - The position of the previous container that called this render function
+		 */
+		value: function(context, parentPosition) {
+
+			//Check if the container and it's children even need to be rendered
+			if(!this.visible){
+
+				return;
+
+			}
+
+			//Create a new starting position using the provided position and the position of this container
+			var newPosition = parentPosition.combine(this.position);
+
+			//Grab all messages from the text log
+			var messages = this.game.textLog.getMessages();
+
+			//Determine what the lineHeight is
+			var lineHeight = this.fontSize + 5;
+
+			//Loop through each element in this container
+			for(var i = 0; i < this.maxMessages; i++) {
+
+				if(!messages[messages.length - 1 - i]){
+					break;
+				}
+
+				//Define the visual style of the text, font, color, etc
+				context.font = this.fontSize + "px " + this.font;
+				context.fillStyle = this.color;
+
+				//Draw the text on screen
+				context.fillText(
+					messages[messages.length - 1 - i],
+					newPosition.x,
+					newPosition.y + lineHeight + (lineHeight * i)
+				);
+
+			}
+
+		}
+
+	}
+
+});
+
+//Export the Browserify module
+module.exports = TextLogElement;
+
+},{"../element.js":46}],46:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+/**
+ * Element constructor
+ *
+ * @class Element
+ * @classdesc A single UI element
+ *
+ * @param {Vector2} position - The position of this element
+ */
+var Element = function(position) {
+
+	/**
+	 * @property {Vector2} position - The position of this element
+	 */
+	this.position = position;
+
+	/**
+	 * @property {Boolean} visible - Is this UI element visible or not
+	 */
+	this.visible = true;
+
+	/**
+	 * @property {Number} alpha - The opacity of the element
+	 */
+	this.alpha = 1;
+
+	/**
+	 * @property {Number} scale - The scale factor of the element
+	 */
+	this.scale = 1;
+
+};
+
+Element.prototype = {
+
+	/**
+	 * Toggle the visibility of this UI element
+	 * @protected
+	 */
+	toggleVisibility: function() {
+
+		//Invert the visibility of the UI element
+		this.visible = !this.visible;
+
+	}
+
+};
+
+//Export the Browserify module
+module.exports = Element;
+
+},{}]},{},[31])
