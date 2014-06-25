@@ -136,5 +136,7 @@ Do you have great ideas, do you want to contribute or just send
 me an email. You can reach me by emailing to contact@stefanweck.nl!
 
 ## License
-This project is licensed under the terms of the MIT license, 
+This project ( the code ) is licensed under the terms of the MIT license,
 found in [LICENSE.md](LICENSE.md)
+
+The MIT license does not apply to the art used in this project. Please create your own art when using the code from this project.
