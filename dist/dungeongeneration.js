@@ -185,7 +185,10 @@ var Utils = require('./utils.js'),
     PlayerFactory = require('../factories/playerfactory.js'),
     Vector2 = require('../geometry/vector2.js'),
     Container = require('../ui/container.js'),
+    InteractionManager = require('../ui/interactionmanager.js'),
     TextLogElement = require('../ui/custom/textlog.js'),
+    ImageElement = require('../ui/elements/imageelement.js'),
+    TextElement = require('../ui/elements/textelement.js'),
     Group = require('../gameobjects/group.js'),
     Combat = require('../gameobjects/systems/combat.js'),
     LightMap = require('../gameobjects/systems/lightmap.js'),
@@ -245,12 +248,12 @@ var Game = function(userSettings) {
 	this.scheduler = null;
 
 	/**
-	 * @property {Roguelike.Systems} staticSystems - An object with all the static systems
+	 * @property {Object} staticSystems - An object with all the static systems
 	 */
 	this.staticSystems = {};
 
 	/**
-	 * @property {Roguelike.Systems} dynamicSystems - An array with all the current systems that need to be looped
+	 * @property {Array} dynamicSystems - An array with all the current systems that need to be looped
 	 */
 	this.dynamicSystems = [];
 
@@ -263,6 +266,11 @@ var Game = function(userSettings) {
 	 * @property {Container} UI - Reference to the global UI container
 	 */
 	this.UI = null;
+
+	/**
+	 * @property {InteractionManager} interactionmanager - Reference to the interactionmanager
+	 */
+	this.interactionmanager = null;
 
 	/**
 	 * @property {TextLog} textLog - Reference to the TextLog object
@@ -352,6 +360,15 @@ Game.prototype = {
 		//Create a new text log
 		this.textLog = new TextLog();
 
+		//Add another string to the message
+		var textLogMessage = "You enter the basement and look around";
+
+		//Add the message to the textlog
+		this.textLog.addMessage(textLogMessage);
+
+		//Create a new interaction manager
+		this.interactionmanager = new InteractionManager(this.settings.canvas);
+
 		//Initialize the UI
 		this.initializeUI();
 
@@ -432,16 +449,89 @@ Game.prototype = {
 	initializeUI: function() {
 
 		//Create the global UI container
-		this.UI = new Container(
-			new Vector2(0, 0)
+		var UI = new Container(
+			new Vector2(0, 0),
+			null
 		);
 
+		//Store the UI in the game object
+		this.UI = UI;
+
+		//Create the textlog
 		var textLog = new TextLogElement(
 			new Vector2(15, 15),
+			UI,
 			this
 		);
 
+		//Add the textlog to the UI
 		this.UI.addElement(textLog);
+
+		//Create the bottom bar container
+		var bottomBar = new Container(
+			new Vector2((this.settings.canvas.width / 2) - 400, this.settings.canvas.height - 100),
+			UI,
+			940,
+			100
+		);
+
+		//Loop 9 times to create all the left slots
+		for(var i = 0; i < 18; i++){
+
+			//The default distance is 0
+			var distance = 0;
+
+			//And we only add it whenever we are starting at the second bar of quick slots
+			if(i > 8){
+				distance = 48;
+			}
+
+			//Create the item slot container
+			var iconSlot = new Container(
+				new Vector2(i * 44 + distance, 15),
+				bottomBar,
+				44,
+				44
+			);
+
+			//Add the background image
+			iconSlot.addElement(
+				new ImageElement(
+					new Vector2(0,0),
+					iconSlot,
+					"itemslot",
+					3
+				)
+			);
+
+			//Create the little text in the corner
+			iconSlot.addElement(
+				new TextElement(
+					new Vector2(28, 28),
+					iconSlot,
+					i + 1,
+					"#606060",
+					10
+				)
+			);
+
+			//Add a function the onHover object from the item slot container
+			iconSlot.onClick = function (index) {
+				return function() {
+					console.log("Quickslot number "+index);
+				};
+			}(i + 1);
+
+			//Add the slot to the bottom bar
+			bottomBar.addElement(iconSlot);
+
+			//Add the iconSlot to the interactive elements list
+			this.interactionmanager.elements.push(iconSlot);
+
+		}
+
+		//Add the bottom bar to the UI
+		this.UI.addElement(bottomBar);
 
 	},
 
@@ -508,7 +598,7 @@ Game.prototype = {
 //Export the Browserify module
 module.exports = Game;
 
-},{"../factories/playerfactory.js":7,"../gameobjects/group.js":22,"../gameobjects/systems/combat.js":23,"../gameobjects/systems/lightmap.js":24,"../gameobjects/systems/movement.js":25,"../gameobjects/systems/open.js":26,"../gameobjects/systems/pathfinding.js":27,"../gameobjects/systems/render.js":28,"../geometry/vector2.js":30,"../input/keyboard.js":34,"../tilemap/map.js":37,"../tilemap/mapdecorator.js":38,"../tilemap/mapfactory.js":39,"../time/scheduler.js":43,"../ui/container.js":44,"../ui/custom/textlog.js":45,"./camera.js":1,"./textlog.js":3,"./utils.js":4}],3:[function(require,module,exports){
+},{"../factories/playerfactory.js":7,"../gameobjects/group.js":22,"../gameobjects/systems/combat.js":23,"../gameobjects/systems/lightmap.js":24,"../gameobjects/systems/movement.js":25,"../gameobjects/systems/open.js":26,"../gameobjects/systems/pathfinding.js":27,"../gameobjects/systems/render.js":28,"../geometry/vector2.js":30,"../input/keyboard.js":34,"../tilemap/map.js":37,"../tilemap/mapdecorator.js":38,"../tilemap/mapfactory.js":39,"../time/scheduler.js":43,"../ui/container.js":44,"../ui/custom/textlog.js":45,"../ui/elements/imageelement.js":47,"../ui/elements/textelement.js":48,"../ui/interactionmanager.js":49,"./camera.js":1,"./textlog.js":3,"./utils.js":4}],3:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -2983,11 +3073,6 @@ var Render = function(game) {
 	 */
 	this.context = null;
 
-	/**
-	 * @property {Object} mousePos - Object with x and y coordinate of the cursor on the canvas
-	 */
-	this.mousePos = null;
-
 	//Initialize itself
 	this.initialize();
 
@@ -3007,9 +3092,6 @@ Render.prototype = {
 
 		//Define the context to draw on
 		this.context = this.game.settings.canvas.getContext("2d");
-
-		//Add the mouse move event listener to the canvas to always have the mouse position stored
-		this.canvas.addEventListener("mousemove", this.getMousePointer.bind(this));
 
 		//Disable image smoothing with some very ugly browser specific code
 		//TODO: Check again in 10 years if there are better solutions to this
@@ -3221,14 +3303,10 @@ Render.prototype = {
 		//Define variables
 		var map = this.game.map;
 		var camera = this.game.camera;
+		this.mousePos = this.game.interactionmanager.mousePos;
 
 		//TODO: Use a preloader and only get the file once, not every frame
 		var img = document.getElementById("ui");
-
-		//If the mouse position isn't set, stop right here
-		if(this.mousePos === null) {
-			return;
-		}
 
 		//Calculate the offset of the camera, how many pixels are left at the left and top of the screen
 		var cameraXOffset = camera.position.x % map.settings.tileSize;
@@ -3373,23 +3451,6 @@ Render.prototype = {
 
 		//Provide the canvas context and a starting position of 0,0 in the top left
 		this.game.UI.render(this.context, new Vector2(0, 0));
-
-	},
-
-	/**
-	 * Get the position of the mouse on the canvas and store it for later use
-	 * @protected
-	 */
-	getMousePointer: function(event) {
-
-		//Get the rectangle from the canvas
-		var rect = this.canvas.getBoundingClientRect();
-
-		//Calculate the mouse position
-		this.mousePos = {
-			x: event.clientX - rect.left,
-			y: event.clientY - rect.top
-		};
 
 	},
 
@@ -6751,8 +6812,6 @@ Scheduler.prototype = {
 		//Check if the lockCount is 0
 		if(this.lockCount === 0) {
 
-			//Throw an error in the console and return
-			console.error("You can't unlock an unlocked scheduler!");
 			return;
 
 		}
@@ -6782,13 +6841,16 @@ var Element = require('./element.js');
  * Inherits from Element
  *
  * @param {Vector2} position - The position of this element
+ * @param {Object} parent - The parent of this element
+ * @param {Number} width - The width of this element
+ * @param {Number} height - The height of this element
  */
-var Container = function(position) {
+var Container = function(position, parent, width, height) {
 
 	/**
 	 * Inherit the constructor from the Element class
 	 */
-	Element.call(this, position);
+	Element.call(this, position, parent, width, height);
 
 	/**
 	 * @property {Array} elements - An array that holds all UI elements
@@ -6858,7 +6920,7 @@ Container.prototype = Object.create(Element.prototype, {
 		value: function(context, parentPosition) {
 
 			//Check if the container and it's children even need to be rendered
-			if(!this.visible){
+			if(!this.visible || this.alpha === 0){
 
 				return;
 
@@ -6899,14 +6961,15 @@ var Element = require('../element.js');
  * Inherits from Element
  *
  * @param {Vector2} position - The position of this element
+ * @param {Object} parent - The parent of this element
  * @param {Game} game - Reference to the currently running game
  */
-var TextLogElement = function(position, game) {
+var TextLogElement = function(position, parent, game) {
 
 	/**
 	 * Inherit the constructor from the Element class
 	 */
-	Element.call(this, position);
+	Element.call(this, position, parent);
 
 	/**
 	 * @property {Game} game - Reference to the current game object
@@ -6967,6 +7030,7 @@ TextLogElement.prototype = Object.create(Element.prototype, {
 			//Loop through each element in this container
 			for(var i = 0; i < this.maxMessages; i++) {
 
+				//If there isn't another message in the text log, stop here
 				if(!messages[messages.length - 1 - i]){
 					break;
 				}
@@ -7004,8 +7068,11 @@ module.exports = TextLogElement;
  * @classdesc A single UI element
  *
  * @param {Vector2} position - The position of this element
+ * @param {Object} parent - The parent of this element
+ * @param {Number} width - The width of this element
+ * @param {Number} height - The height of this element
  */
-var Element = function(position) {
+var Element = function(position, parent, width, height) {
 
 	/**
 	 * @property {Vector2} position - The position of this element
@@ -7013,9 +7080,24 @@ var Element = function(position) {
 	this.position = position;
 
 	/**
+	 * @property {Number} width - The width of this element
+	 */
+	this.width = width || 300;
+
+	/**
+	 * @property {Number} height - The height of this element
+	 */
+	this.height = height || 300;
+
+	/**
 	 * @property {Boolean} visible - Is this UI element visible or not
 	 */
 	this.visible = true;
+
+	/**
+	 * @property {Object} parent - The parent of this element
+	 */
+	this.parent = parent;
 
 	/**
 	 * @property {Number} alpha - The opacity of the element
@@ -7026,6 +7108,11 @@ var Element = function(position) {
 	 * @property {Number} scale - The scale factor of the element
 	 */
 	this.scale = 1;
+
+	/**
+	 * @property {Boolean} hover - Is the user currently hovering this element
+	 */
+	this.hover = false;
 
 };
 
@@ -7040,11 +7127,347 @@ Element.prototype = {
 		//Invert the visibility of the UI element
 		this.visible = !this.visible;
 
+	},
+
+	/**
+	 * Return the position based on the parent's position
+	 * @protected
+	 */
+	getPosition: function(){
+
+		//Check if this element has a parent
+		if(this.parent === null){
+
+			//No parent, this is the final position
+			return this.position;
+
+		}else{
+
+			//Get the position from the parent
+			var parentPosition = this.parent.getPosition();
+
+			//Combine that position with this position
+			return parentPosition.combine(this.position);
+
+		}
+
+	},
+
+	/**
+	 * Function that is here to be overwritten
+	 * @protected
+	 */
+	onHover: function(){
+		//Overwrite
+	},
+
+	/**
+	 * Function that is here to be overwritten
+	 * @protected
+	 */
+	onClick: function(){
+		//Overwrite
 	}
 
 };
 
 //Export the Browserify module
 module.exports = Element;
+
+},{}],47:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+//Require necessary modules
+var Element = require('../element.js');
+
+/**
+ * Image Element constructor
+ *
+ * @class Image
+ * @classdesc An UI image element
+ * Inherits from Element
+ *
+ * @param {Vector2} position - The position of the previous container that called this render function
+ * @param {Object} parent - The parent of this element
+ * @param {String} image - The source of the image that is being used
+ * @param {Number} scale - (optional) The scale of the image, defaults to 1
+ */
+var ImageElement = function(position, parent, image, scale) {
+
+	/**
+	 * Inherit the constructor from the Element class
+	 */
+	Element.call(this, position, parent);
+
+	/**
+	 * @property {String} image - The source of the image that is being used
+	 */
+	this.image = image;
+
+	/**
+	 * @property {Number} scale - The scale of the image, defaults to 1
+	 */
+	this.scale = scale || 1;
+
+};
+
+ImageElement.prototype = Object.create(Element.prototype, {
+
+	render: {
+
+		/**
+		 * Returns a function that handles rendering the current Element
+		 * @protected
+		 *
+		 * @param {Object} context - Reference to the current canvas context
+		 * @param {Vector2} parentPosition - The position of the previous container that called this render function
+		 */
+		value: function(context, parentPosition) {
+
+			//Create a new starting position using the provided position and the position of this element
+			var newPosition = parentPosition.combine(this.position);
+
+			//TODO: Use a preloader and only get the file once, not every frame
+			//Get the image
+			var image = document.getElementById(this.image);
+
+			//Draw the image on the canvas context
+			context.drawImage(
+				image,
+				newPosition.x,
+				newPosition.y,
+				image.width * this.scale,
+				image.height * this.scale
+			);
+
+		}
+
+	}
+
+});
+
+//Export the Browserify module
+module.exports = ImageElement;
+
+},{"../element.js":46}],48:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+//Require necessary modules
+var Element = require('../element.js');
+
+/**
+ * Text Element constructor
+ *
+ * @class Text
+ * @classdesc An UI text element
+ * Inherits from Element
+ *
+ * @param {Vector2} position - The position of the previous container that called this render function
+ * @param {Object} parent - The parent of this element
+ * @param {String} text - The text that is being displayed
+ * @param {String} color - (optional) The color of the text. In RGBA format: rgba(255, 255, 255, 1)
+ * @param {Number} fontSize - (optional) The size of the text
+ * @param {String} font - (optional) The font that the text is being rendered in
+ */
+var TextElement = function(position, parent, text, color, fontSize, font) {
+
+	/**
+	 * Inherit the constructor from the Element class
+	 */
+	Element.call(this, position, parent);
+
+	/**
+	 * @property {String} text - The text that is being displayed
+	 */
+	this.text = text;
+
+	/**
+	 * @property {Number} fontSize - The size of the text
+	 */
+	this.color = color || "rgba(255, 255, 255, 1)";
+
+	/**
+	 * @property {Number} fontSize - The size of the text
+	 */
+	this.fontSize = fontSize || 12;
+
+	/**
+	 * @property {String} font - The font that the text is being rendered in
+	 */
+	this.font = font || "Courier New";
+
+};
+
+TextElement.prototype = Object.create(Element.prototype, {
+
+	render: {
+
+		/**
+		 * Returns a function that handles rendering the current Element
+		 * @protected
+		 *
+		 * @param {Object} context - Reference to the current canvas context
+		 * @param {Vector2} parentPosition - The position of the previous container that called this render function
+		 */
+		value: function(context, parentPosition) {
+
+			//Create a new starting position using the provided position and the position of this element
+			var newPosition = parentPosition.combine(this.position);
+
+			//Determine what the lineHeight is
+			var lineHeight = this.fontSize;
+
+			//Define the visual style of the text, font, color, etc
+			context.font = this.fontSize + "px " + this.font;
+			context.fillStyle = this.color;
+
+			//Draw the text on screen
+			context.fillText(
+				this.text,
+				newPosition.x,
+				newPosition.y + lineHeight
+			);
+
+		}
+
+	}
+
+});
+
+//Export the Browserify module
+module.exports = TextElement;
+
+
+},{"../element.js":46}],49:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+/**
+ * InteractionManager constructor
+ *
+ * @class InteractionManager
+ * @classdesc An object that manages all mouse interaction and interactive elements
+ *
+ * @param {Object} target - The target of this interaction manager
+ */
+var InteractionManager = function(target) {
+
+	/**
+	 * @property {Object} target - The target of this interaction manager
+	 */
+	this.target = target;
+
+	/**
+	 * @property {Object} mousePos - Object with x and y coordinate of the cursor on the canvas
+	 */
+	this.mousePos = {x:0, y:0};
+
+	/**
+	 * @property {Array} elements - Array that stores all interactive elements
+	 */
+	this.elements = [];
+
+	//Initialize itself
+	this.initialize();
+
+};
+
+InteractionManager.prototype = {
+
+	/**
+	 * Initialize the Interaction Manager with the correct event listeners
+	 * @protected
+	 */
+	initialize: function(){
+
+		//Add the mouse move event listener to the canvas to always have the mouse position stored
+		this.target.addEventListener("mousemove", this.onMouseMove.bind(this));
+		this.target.addEventListener("mousedown", this.onMouseDown.bind(this));
+
+	},
+
+	/**
+	 * Get the position of the mouse on the canvas and store it for later use
+	 * @protected
+	 */
+	onMouseMove: function(event) {
+
+		//Calculate the mouse position
+		this.calculatePosition(event);
+
+		//Loop through all interactive elements
+		for(var i = 0; i < this.elements.length; i++){
+
+			//Get the position of this element on the canvas
+			var position = this.elements[i].getPosition();
+
+			//Check if our mouse hovers the element
+			if(this.mousePos.x >= position.x && this.mousePos.x <= position.x + this.elements[i].width && this.mousePos.y >= position.y && this.mousePos.y <= position.y + this.elements[i].height){
+
+				//We are hovering the current element
+				this.elements[i].onHover();
+
+				//Break the for loop, because we don't want underlaying elements to also have the hover variable on true
+				break;
+
+			}
+
+		}
+
+	},
+
+	/**
+	 * Function that is executed when the user pressed his mouse
+	 * @protected
+	 */
+	onMouseDown: function(event) {
+
+		//Calculate the mouse position
+		this.calculatePosition(event);
+
+		//Loop through all interactive elements
+		for(var i = 0; i < this.elements.length; i++){
+
+			//Get the position of this element on the canvas
+			var position = this.elements[i].getPosition();
+
+			//Check if our mouse hovers the element
+			if(this.mousePos.x >= position.x && this.mousePos.x <= position.x + this.elements[i].width && this.mousePos.y >= position.y && this.mousePos.y <= position.y + this.elements[i].height){
+
+				//We are hovering the current element
+				this.elements[i].onClick();
+
+				//Break the for loop, because we don't want underlaying elements to also have the hover variable on true
+				break;
+
+			}
+
+		}
+
+	},
+
+	/**
+	 * Function that calculates the mouse position on the canvas
+	 * @protected
+	 */
+	calculatePosition: function(event){
+
+		//Get the rectangle from the target canvas
+		var rect = this.target.getBoundingClientRect();
+
+		//Calculate the mouse position
+		this.mousePos = {
+			x: event.clientX - rect.left,
+			y: event.clientY - rect.top
+		};
+
+	}
+
+};
+
+//Export the Browserify module
+module.exports = InteractionManager;
 
 },{}]},{},[31])
