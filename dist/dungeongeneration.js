@@ -108,31 +108,35 @@ Camera.prototype = {
 			//Define the variables needed for moving the camera
 			var tileSize = this.game.map.settings.tileSize;
 
+			//Calculate the center position of the object that we are following
+			var followCenterX = (this.followObject.position.x * tileSize) + (tileSize / 2);
+			var followCenterY = (this.followObject.position.y * tileSize) + (tileSize / 2);
+
 			//Move the camera horizontal first
 			//We Math.floor the final position so the position is always a rounded number. This prevents the pixel scaling from trying to enlarge half pixels and thus providing weird graphics.
-			if((this.followObject.position.x * tileSize) - this.position.x + this.minimumDistanceX > this.viewportWidth) {
+			if(followCenterX - this.position.x + this.minimumDistanceX > this.viewportWidth) {
 
 				//Set the new horizontal position for the camera
-				this.position.x = Math.floor((this.followObject.position.x * tileSize) - (this.viewportWidth - this.minimumDistanceX));
+				this.position.x = Math.floor(followCenterX - (this.viewportWidth - this.minimumDistanceX));
 
-			}else if((this.followObject.position.x * tileSize) - this.minimumDistanceX < this.position.x) {
+			}else if(followCenterX - this.minimumDistanceX < this.position.x) {
 
 				//Set the new horizontal position for the camera
-				this.position.x = Math.floor((this.followObject.position.x * tileSize) - this.minimumDistanceX);
+				this.position.x = Math.floor(followCenterX - this.minimumDistanceX);
 
 			}
 
 			//Then move the camera vertical
 			//We Math.floor the final position so the position is always a rounded number. This prevents the pixel scaling from trying to enlarge half pixels and thus providing weird graphics.
-			if((this.followObject.position.y * tileSize) - this.position.y + this.minimumDistanceY > this.viewportHeight) {
+			if(followCenterY - this.position.y + this.minimumDistanceY > this.viewportHeight) {
 
 				//Set the new vertical position for the camera
-				this.position.y = Math.floor((this.followObject.position.y * tileSize) - (this.viewportHeight - this.minimumDistanceY));
+				this.position.y = Math.floor(followCenterY - (this.viewportHeight - this.minimumDistanceY));
 
-			}else if((this.followObject.position.y * tileSize) - this.minimumDistanceY < this.position.y) {
+			}else if(followCenterY - this.minimumDistanceY < this.position.y) {
 
 				//Set the new vertical position for the camera
-				this.position.y = Math.floor((this.followObject.position.y * tileSize) - this.minimumDistanceY);
+				this.position.y = Math.floor(followCenterY - this.minimumDistanceY);
 
 			}
 
@@ -179,27 +183,27 @@ module.exports = Camera;
 
 //Require necessary modules
 var Utils = require('./utils.js'),
-    TextLog = require('./textlog.js'),
-    Camera = require('./camera.js'),
-    Map = require('../tilemap/map.js'),
-    PlayerFactory = require('../factories/playerfactory.js'),
-    Vector2 = require('../geometry/vector2.js'),
-    Container = require('../ui/container.js'),
-    InteractionManager = require('../ui/interactionmanager.js'),
-    TextLogElement = require('../ui/custom/textlog.js'),
-    ImageElement = require('../ui/elements/imageelement.js'),
-    TextElement = require('../ui/elements/textelement.js'),
-    Group = require('../gameobjects/group.js'),
-    Combat = require('../gameobjects/systems/combat.js'),
-    LightMap = require('../gameobjects/systems/lightmap.js'),
-    Movement = require('../gameobjects/systems/movement.js'),
-    Open = require('../gameobjects/systems/open.js'),
-    PathFinding = require('../gameobjects/systems/pathfinding.js'),
-    Render = require('../gameobjects/systems/render.js'),
-    MapFactory = require('../tilemap/mapfactory.js'),
-    MapDecorator = require('../tilemap/mapdecorator.js'),
-    Scheduler = require('../time/scheduler.js'),
-    Keyboard = require('../input/keyboard.js');
+	TextLog = require('./textlog.js'),
+	Camera = require('./camera.js'),
+	Map = require('../tilemap/map.js'),
+	PlayerFactory = require('../factories/playerfactory.js'),
+	Vector2 = require('../geometry/vector2.js'),
+	Container = require('../ui/container.js'),
+	InteractionManager = require('../ui/interactionmanager.js'),
+	TextLogElement = require('../ui/custom/textlog.js'),
+	ImageElement = require('../ui/elements/imageelement.js'),
+	TextElement = require('../ui/elements/textelement.js'),
+	Group = require('../gameobjects/group.js'),
+	Combat = require('../gameobjects/systems/combat.js'),
+	LightMap = require('../gameobjects/systems/lightmap.js'),
+	Movement = require('../gameobjects/systems/movement.js'),
+	Open = require('../gameobjects/systems/open.js'),
+	PathFinding = require('../gameobjects/systems/pathfinding.js'),
+	Render = require('../gameobjects/systems/render.js'),
+	MapFactory = require('../tilemap/mapfactory.js'),
+	MapDecorator = require('../tilemap/mapdecorator.js'),
+	Scheduler = require('../time/scheduler.js'),
+	Keyboard = require('../input/keyboard.js');
 
 /**
  * Game Constructor
@@ -330,9 +334,9 @@ Game.prototype = {
 		//Associative array with every control that this entity uses
 		var playerControls = {
 			"left": 65,
-			"right":68,
-			"up":87,
-			"down":83
+			"right": 68,
+			"up": 87,
+			"down": 83
 		};
 
 		//Create the player entity
@@ -469,20 +473,20 @@ Game.prototype = {
 
 		//Create the bottom bar container
 		var bottomBar = new Container(
-			new Vector2((this.settings.canvas.width / 2) - 400, this.settings.canvas.height - 100),
+			new Vector2((this.settings.canvas.width / 2) - 418, this.settings.canvas.height - 100),
 			UI,
 			940,
 			100
 		);
 
 		//Loop 9 times to create all the left slots
-		for(var i = 0; i < 18; i++){
+		for(var i = 0; i < 18; i++) {
 
 			//The default distance is 0
 			var distance = 0;
 
 			//And we only add it whenever we are starting at the second bar of quick slots
-			if(i > 8){
+			if(i > 8) {
 				distance = 48;
 			}
 
@@ -497,7 +501,7 @@ Game.prototype = {
 			//Add the background image
 			iconSlot.addElement(
 				new ImageElement(
-					new Vector2(0,0),
+					new Vector2(0, 0),
 					iconSlot,
 					"itemslot",
 					3
@@ -516,9 +520,9 @@ Game.prototype = {
 			);
 
 			//Add a function the onHover object from the item slot container
-			iconSlot.onClick = function (index) {
+			iconSlot.onClick = function(index) {
 				return function() {
-					console.log("Quickslot number "+index);
+					console.log("Quickslot number " + index);
 				};
 			}(i + 1);
 
@@ -727,9 +731,9 @@ module.exports = Utils;
 
 //Require necessary modules
 var Entity = require('../gameobjects/entity.js'),
-    Position = require('../gameobjects/components/position.js'),
-    Utils = require('../core/utils.js'),
-    Sprite = require('../gameobjects/components/sprite.js');
+	Position = require('../gameobjects/components/position.js'),
+	Utils = require('../core/utils.js'),
+	Sprite = require('../gameobjects/components/sprite.js');
 
 /**
  * @class DecorationFactory
@@ -774,16 +778,16 @@ module.exports = DecorationFactory;
 
 //Require necessary modules
 var Entity = require('../gameobjects/entity.js'),
-    MoveBehaviours = require('../gameobjects/behaviours/moveBehaviours.js'),
-    Position = require('../gameobjects/components/position.js'),
-    CanOpen = require('../gameobjects/components/canopen.js'),
-    Collide = require('../gameobjects/components/collide.js'),
-    Health = require('../gameobjects/components/health.js'),
-    CanFight = require('../gameobjects/components/canfight.js'),
-    Weapon = require('../gameobjects/components/weapon.js'),
-    MovementComponent = require('../gameobjects/components/movement.js'),
-    Tooltip = require('../gameobjects/components/tooltip.js'),
-    Sprite = require('../gameobjects/components/sprite.js');
+	MoveBehaviours = require('../gameobjects/behaviours/moveBehaviours.js'),
+	Position = require('../gameobjects/components/position.js'),
+	CanOpen = require('../gameobjects/components/canopen.js'),
+	Collide = require('../gameobjects/components/collide.js'),
+	Health = require('../gameobjects/components/health.js'),
+	CanFight = require('../gameobjects/components/canfight.js'),
+	Weapon = require('../gameobjects/components/weapon.js'),
+	MovementComponent = require('../gameobjects/components/movement.js'),
+	Tooltip = require('../gameobjects/components/tooltip.js'),
+	Sprite = require('../gameobjects/components/sprite.js');
 
 /**
  * @class EnemyFactory
@@ -909,15 +913,15 @@ module.exports = EnemyFactory;
 
 //Require necessary modules
 var Entity = require('../gameobjects/entity.js'),
-    Health = require('../gameobjects/components/health.js'),
-    LightSource = require('../gameobjects/components/lightsource.js'),
-    Collide = require('../gameobjects/components/collide.js'),
-    Weapon = require('../gameobjects/components/weapon.js'),
-    KeyboardControl = require('../gameobjects/components/keyboardcontrol.js'),
-    CanFight = require('../gameobjects/components/canfight.js'),
-    Tooltip = require('../gameobjects/components/tooltip.js'),
-    Sprite = require('../gameobjects/components/sprite.js'),
-    Position = require('../gameobjects/components/position.js');
+	Health = require('../gameobjects/components/health.js'),
+	LightSource = require('../gameobjects/components/lightsource.js'),
+	Collide = require('../gameobjects/components/collide.js'),
+	Weapon = require('../gameobjects/components/weapon.js'),
+	KeyboardControl = require('../gameobjects/components/keyboardcontrol.js'),
+	CanFight = require('../gameobjects/components/canfight.js'),
+	Tooltip = require('../gameobjects/components/tooltip.js'),
+	Sprite = require('../gameobjects/components/sprite.js'),
+	Position = require('../gameobjects/components/position.js');
 
 /**
  * @class PlayerFactory
@@ -994,11 +998,11 @@ module.exports = PlayerFactory;
 
 //Require necessary modules
 var Entity = require('../gameobjects/entity.js'),
-    Position = require('../gameobjects/components/position.js'),
-    CanOpen = require('../gameobjects/components/canopen.js'),
-    Collide = require('../gameobjects/components/collide.js'),
-    Tooltip = require('../gameobjects/components/tooltip.js'),
-    Sprite = require('../gameobjects/components/sprite.js');
+	Position = require('../gameobjects/components/position.js'),
+	CanOpen = require('../gameobjects/components/canopen.js'),
+	Collide = require('../gameobjects/components/collide.js'),
+	Tooltip = require('../gameobjects/components/tooltip.js'),
+	Sprite = require('../gameobjects/components/sprite.js');
 
 /**
  * @class PropFactory
@@ -1490,7 +1494,7 @@ KeyboardControl.prototype = {
 		for(var key in this.controls) {
 
 			//Make sure that obj[key] belongs to the object and was not inherited
-			if (this.controls.hasOwnProperty(key)) {
+			if(this.controls.hasOwnProperty(key)) {
 
 				switch(key) {
 
@@ -2331,7 +2335,7 @@ Combat.prototype = {
 			healthComponent.takeDamage(weaponComponent.damage);
 
 			//Generate the TextLog message
-			var textLogMessage = entity.name+" hit "+enemyEntity.name+" for "+weaponComponent.damage+" damage";
+			var textLogMessage = entity.name + " hit " + enemyEntity.name + " for " + weaponComponent.damage + " damage";
 
 			//If the enemy is dead, we have to remove him from the game
 			if(healthComponent.isDead()) {
@@ -2448,7 +2452,7 @@ LightMap.prototype = {
 	 */
 	update: function() {
 
-		if (this.game.isActive) {
+		if(this.game.isActive) {
 
 			//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
 			var entities = this.game.map.entities.getEntities("lightSource", "position");
@@ -2526,7 +2530,7 @@ LightMap.prototype = {
 
 		var newStart = 0;
 
-		if(start < end){
+		if(start < end) {
 			return;
 		}
 
@@ -2587,7 +2591,7 @@ LightMap.prototype = {
 				}
 			}
 
-			if(blocked){
+			if(blocked) {
 				break;
 			}
 
@@ -2797,7 +2801,7 @@ Movement.prototype = {
 					}
 
 					//Make sure that obj[key] belongs to the object and was not inherited
-					if (nextTile.entities[i].components.hasOwnProperty(key)) {
+					if(nextTile.entities[i].components.hasOwnProperty(key)) {
 
 						//Check if the component has an events parameter
 						if(typeof nextTile.entities[i].components[key].events !== "undefined") {
@@ -2900,7 +2904,7 @@ module.exports = Open;
 
 //Require necessary modules
 var EasyStar = require('../../libraries/easystar.js'),
-    Vector2 = require('../../geometry/vector2.js');
+	Vector2 = require('../../geometry/vector2.js');
 
 /**
  * PathFinding System constructor
@@ -5102,10 +5106,10 @@ module.exports = Map;
 
 //Require necessary modules
 var PropFactory = require('../factories/propfactory.js'),
-    DecorationFactory = require('../factories/decorationfactory.js'),
-    EnemyFactory = require('../factories/enemyfactory.js'),
-    Vector2 = require('../geometry/vector2.js'),
-    Utils = require('../core/utils.js');
+	DecorationFactory = require('../factories/decorationfactory.js'),
+	EnemyFactory = require('../factories/enemyfactory.js'),
+	Vector2 = require('../geometry/vector2.js'),
+	Utils = require('../core/utils.js');
 
 /**
  * MapDecorator constructor
@@ -5514,9 +5518,9 @@ module.exports = MapDecorator;
 
 //Require necessary modules
 var Room = require('./room.js'),
-    Vector2 = require('../geometry/vector2.js'),
-    EnemyFactory = require('../factories/enemyfactory.js'),
-    Utils = require('../core/utils.js');
+	Vector2 = require('../geometry/vector2.js'),
+	EnemyFactory = require('../factories/enemyfactory.js'),
+	Utils = require('../core/utils.js');
 
 /**
  * MapFactory constructor
@@ -6149,8 +6153,8 @@ module.exports = MapFactory;
 
 //Require necessary modules
 var Tile = require('./tile.js'),
-    Vector2 = require('../geometry/vector2.js'),
-    Utils = require('../core/utils.js');
+	Vector2 = require('../geometry/vector2.js'),
+	Utils = require('../core/utils.js');
 
 /**
  * Room constructor
@@ -6920,7 +6924,7 @@ Container.prototype = Object.create(Element.prototype, {
 		value: function(context, parentPosition) {
 
 			//Check if the container and it's children even need to be rendered
-			if(!this.visible || this.alpha === 0){
+			if(!this.visible || this.alpha === 0) {
 
 				return;
 
@@ -7012,7 +7016,7 @@ TextLogElement.prototype = Object.create(Element.prototype, {
 		value: function(context, parentPosition) {
 
 			//Check if the container and it's children even need to be rendered
-			if(!this.visible){
+			if(!this.visible) {
 
 				return;
 
@@ -7031,7 +7035,7 @@ TextLogElement.prototype = Object.create(Element.prototype, {
 			for(var i = 0; i < this.maxMessages; i++) {
 
 				//If there isn't another message in the text log, stop here
-				if(!messages[messages.length - 1 - i]){
+				if(!messages[messages.length - 1 - i]) {
 					break;
 				}
 
@@ -7133,10 +7137,10 @@ Element.prototype = {
 	 * Return the position based on the parent's position
 	 * @protected
 	 */
-	getPosition: function(){
+	getPosition: function() {
 
 		//Check if this element has a parent
-		if(this.parent === null){
+		if(this.parent === null) {
 
 			//No parent, this is the final position
 			return this.position;
@@ -7157,16 +7161,20 @@ Element.prototype = {
 	 * Function that is here to be overwritten
 	 * @protected
 	 */
-	onHover: function(){
+	onHover: function() {
+
 		//Overwrite
+
 	},
 
 	/**
 	 * Function that is here to be overwritten
 	 * @protected
 	 */
-	onClick: function(){
+	onClick: function() {
+
 		//Overwrite
+
 	}
 
 };
@@ -7362,7 +7370,7 @@ var InteractionManager = function(target) {
 	/**
 	 * @property {Object} mousePos - Object with x and y coordinate of the cursor on the canvas
 	 */
-	this.mousePos = {x:0, y:0};
+	this.mousePos = {x: 0, y: 0};
 
 	/**
 	 * @property {Array} elements - Array that stores all interactive elements
@@ -7380,7 +7388,7 @@ InteractionManager.prototype = {
 	 * Initialize the Interaction Manager with the correct event listeners
 	 * @protected
 	 */
-	initialize: function(){
+	initialize: function() {
 
 		//Add the mouse move event listener to the canvas to always have the mouse position stored
 		this.target.addEventListener("mousemove", this.onMouseMove.bind(this));
@@ -7398,13 +7406,20 @@ InteractionManager.prototype = {
 		this.calculatePosition(event);
 
 		//Loop through all interactive elements
-		for(var i = 0; i < this.elements.length; i++){
+		for(var i = 0; i < this.elements.length; i++) {
+
+			//Don't continue if the element is invisible
+			if(!this.elements[i].visible || this.elements[i].alpha === 0) {
+
+				return;
+
+			}
 
 			//Get the position of this element on the canvas
 			var position = this.elements[i].getPosition();
 
 			//Check if our mouse hovers the element
-			if(this.mousePos.x >= position.x && this.mousePos.x <= position.x + this.elements[i].width && this.mousePos.y >= position.y && this.mousePos.y <= position.y + this.elements[i].height){
+			if(this.mousePos.x >= position.x && this.mousePos.x <= position.x + this.elements[i].width && this.mousePos.y >= position.y && this.mousePos.y <= position.y + this.elements[i].height) {
 
 				//We are hovering the current element
 				this.elements[i].onHover();
@@ -7428,13 +7443,20 @@ InteractionManager.prototype = {
 		this.calculatePosition(event);
 
 		//Loop through all interactive elements
-		for(var i = 0; i < this.elements.length; i++){
+		for(var i = 0; i < this.elements.length; i++) {
+
+			//Don't continue if the element is invisible
+			if(!this.elements[i].visible || this.elements[i].alpha === 0) {
+
+				return;
+
+			}
 
 			//Get the position of this element on the canvas
 			var position = this.elements[i].getPosition();
 
 			//Check if our mouse hovers the element
-			if(this.mousePos.x >= position.x && this.mousePos.x <= position.x + this.elements[i].width && this.mousePos.y >= position.y && this.mousePos.y <= position.y + this.elements[i].height){
+			if(this.mousePos.x >= position.x && this.mousePos.x <= position.x + this.elements[i].width && this.mousePos.y >= position.y && this.mousePos.y <= position.y + this.elements[i].height) {
 
 				//We are hovering the current element
 				this.elements[i].onClick();
@@ -7452,7 +7474,7 @@ InteractionManager.prototype = {
 	 * Function that calculates the mouse position on the canvas
 	 * @protected
 	 */
-	calculatePosition: function(event){
+	calculatePosition: function(event) {
 
 		//Get the rectangle from the target canvas
 		var rect = this.target.getBoundingClientRect();
