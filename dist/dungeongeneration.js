@@ -592,6 +592,9 @@ Game.prototype = {
 		this.staticSystems.pathfindingSystem.game = this;
 		this.staticSystems.pathfindingSystem.initialize();
 
+		//Clear the textlog from the previous game
+		this.textLog.clear();
+
 		//Make game active
 		this.isActive = true;
 
@@ -646,6 +649,16 @@ TextLog.prototype = {
 
 		//Return all messages
 		return this.messages;
+
+	},
+
+	/**
+	 * Clear all messages stored in the textlog
+	 * @protected
+	 */
+	clear: function(){
+
+		this.messages = [];
 
 	}
 
