@@ -3,7 +3,7 @@
 This project started out as a small project to experiment with random dungeon generation. Quickly I began to notice that this was a lot of fun to work with and I added a player. And I added some enemies. And I rewrote the map generator. I added turns. Etc etc, until we ended up here!
 A roguelike game with a random dungeon generator that I am creating purely in javascript on canvas!
 
-_Version: 0.6.3 - Released: 22th June 2014_
+_Version: 0.6.5 - Released: 29th June 2014_
 
 By [Stefan Weck](http://www.stefanweck.nl),
 
