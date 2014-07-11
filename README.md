@@ -81,7 +81,7 @@ Run `grunt debug` to let JSHint check the code for you, a tool that helps to det
 
 ## Changelog
 
-**V.0.6.5**
+**v0.6.5**
 
 - Started with decent version numbering
 - Game is now fullscreen
@@ -89,32 +89,32 @@ Run `grunt debug` to let JSHint check the code for you, a tool that helps to det
 - Started with the UI
 - Converted the whole project to be compatible with Browserify
 
-**V.0.6.0**
+**v0.6.0**
 
 - New map generator
 - Path finding for enemies
 - Major code refactoring
 - Added factories to create entities
 
-**V.0.4.0**
+**v4.0**
 
 - A component entity system
 - Turns
 - Interaction with objects, such as doors
 - Monsters and enemies!
 
-**V.0.2.0**
+**v0.2.0**
 
 - Fog of War!
 - Field of view for the player
 
-**V.0.1.0**
+**v0.1.0**
 
 - A player that can walk through the dungeon
 - A camera with a viewport
 - Configurable settings
 
-**V.0.0.1**
+**v0.0.1**
 
 - Random Dungeon Generation
 - Corridors between the rooms
