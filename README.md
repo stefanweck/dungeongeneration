@@ -1,9 +1,9 @@
-# Random Dungeon Generation V.0.6.5
+# Random Dungeon Generation V.0.6.6
 
 This project started out as a small project to experiment with random dungeon generation. Quickly I began to notice that this was a lot of fun to work with and I added a player. And I added some enemies. And I rewrote the map generator. I added turns. Etc etc, until we ended up here!
 A roguelike game with a random dungeon generator that I am creating purely in javascript on canvas!
 
-_Version: 0.6.5 - Released: 29th June 2014_
+_Version: 0.6.6 - Not released yet_
 
 By [Stefan Weck](http://www.stefanweck.nl),
 
@@ -45,6 +45,10 @@ Note: Move the character around with your WASD keys!
 
 ## What's Next
 
+**PIXI**
+
+Implementing Pixi.js! It's much better to use a library for handling the rendering than to write everything myself.
+
 **Looting**
 
 One of the more important parts of the game is being able to loot enemies, chests and other piles of garbage! This means the player should have an inventory to store and use all these items.
@@ -52,14 +56,6 @@ One of the more important parts of the game is being able to loot enemies, chest
 **Advanced Enemy Behaviour**
 
 For now every enemy is very dumb, they just run to you as soon as they see you. If you manage to lose them they will wait in the dark again until you show up. I want more intelligent monsters that flee when hurt, or that cooperate with other monsters to corner you!
-
-**User Interface**
-
-An user interface that tells the player exactly what is going on. Health bars, fancy buttons, you name it.
-
-**Text Log**
-
-Every classic roguelike has a nice text log telling you exactly what happened. It doesn't need to be very prominent because I want the game itself to be intuitive enough to understand what's going on. But it adds an extra touch to the game.
 
 **Different Types of Rooms**
 
@@ -80,6 +76,10 @@ Run `grunt dev` to watch every module needed in the project for changes. Watchif
 Run `grunt debug` to let JSHint check the code for you, a tool that helps to detect errors and potential problems in your JavaScript code.
 
 ## Changelog
+
+**v0.6.6**
+
+-
 
 **v0.6.5**
 
