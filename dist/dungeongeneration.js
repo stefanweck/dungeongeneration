@@ -177,7 +177,7 @@ Camera.prototype = {
 //Export the Browserify module
 module.exports = Camera;
 
-},{"../geometry/boundary.js":29}],2:[function(require,module,exports){
+},{"../geometry/boundary.js":31}],2:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -203,7 +203,9 @@ var Utils = require('./utils.js'),
 	MapFactory = require('../tilemap/mapfactory.js'),
 	MapDecorator = require('../tilemap/mapdecorator.js'),
 	Scheduler = require('../time/scheduler.js'),
-	Keyboard = require('../input/keyboard.js');
+	Keyboard = require('../input/keyboard.js'),
+	StatusEffects = require('../ui/custom/statuseffects.js'),
+	StatusFire = require('../gameobjects/statuseffects/fire.js');
 
 /**
  * Game Constructor
@@ -438,6 +440,8 @@ Game.prototype = {
 		//Add the player to the tile it spawns on
 		startingTile.addEntity(this.player);
 
+		this.player.statusEffects.push(new StatusFire());
+
 		//Add the player to the scheduler
 		this.scheduler.add(this.player, true);
 
@@ -537,6 +541,15 @@ Game.prototype = {
 		//Add the bottom bar to the UI
 		this.UI.addElement(bottomBar);
 
+		var statusEffects = new StatusEffects(
+			new Vector2(15, 150),
+			UI,
+			this.player
+		);
+
+		//Add the status effects to the UI
+		this.UI.addElement(statusEffects);
+
 	},
 
 	/**
@@ -605,7 +618,7 @@ Game.prototype = {
 //Export the Browserify module
 module.exports = Game;
 
-},{"../factories/playerfactory.js":7,"../gameobjects/group.js":22,"../gameobjects/systems/combat.js":23,"../gameobjects/systems/lightmap.js":24,"../gameobjects/systems/movement.js":25,"../gameobjects/systems/open.js":26,"../gameobjects/systems/pathfinding.js":27,"../gameobjects/systems/render.js":28,"../geometry/vector2.js":30,"../input/keyboard.js":34,"../tilemap/map.js":37,"../tilemap/mapdecorator.js":38,"../tilemap/mapfactory.js":39,"../time/scheduler.js":43,"../ui/container.js":44,"../ui/custom/textlog.js":45,"../ui/elements/imageelement.js":47,"../ui/elements/textelement.js":48,"../ui/interactionmanager.js":49,"./camera.js":1,"./textlog.js":3,"./utils.js":4}],3:[function(require,module,exports){
+},{"../factories/playerfactory.js":7,"../gameobjects/group.js":22,"../gameobjects/statuseffects/fire.js":23,"../gameobjects/systems/combat.js":25,"../gameobjects/systems/lightmap.js":26,"../gameobjects/systems/movement.js":27,"../gameobjects/systems/open.js":28,"../gameobjects/systems/pathfinding.js":29,"../gameobjects/systems/render.js":30,"../geometry/vector2.js":32,"../input/keyboard.js":36,"../tilemap/map.js":39,"../tilemap/mapdecorator.js":40,"../tilemap/mapfactory.js":41,"../time/scheduler.js":45,"../ui/container.js":46,"../ui/custom/statuseffects.js":47,"../ui/custom/textlog.js":48,"../ui/elements/imageelement.js":50,"../ui/elements/textelement.js":51,"../ui/interactionmanager.js":52,"./camera.js":1,"./textlog.js":3,"./utils.js":4}],3:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -738,7 +751,7 @@ var Utils = {
 //Export the Browserify module
 module.exports = Utils;
 
-},{"../libraries/mersennetwister.js":36}],5:[function(require,module,exports){
+},{"../libraries/mersennetwister.js":38}],5:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -1240,7 +1253,7 @@ CanFight.prototype = {
 //Export the Browserify module
 module.exports = CanFight;
 
-},{"../../input/event.js":32}],11:[function(require,module,exports){
+},{"../../input/event.js":34}],11:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -1318,7 +1331,7 @@ CanOpen.prototype = {
 //Export the Browserify module
 module.exports = CanOpen;
 
-},{"../../input/event.js":32}],12:[function(require,module,exports){
+},{"../../input/event.js":34}],12:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -1619,7 +1632,7 @@ KeyboardControl.prototype = {
 module.exports = KeyboardControl;
 
 
-},{"../../geometry/vector2.js":30}],15:[function(require,module,exports){
+},{"../../geometry/vector2.js":32}],15:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -2079,6 +2092,11 @@ var Entity = function(game, name, speed) {
 	 */
 	this.components = {};
 
+	/**
+	 * @property {Array} statusEffects - An array with every status effect that is on this entity
+	 */
+	this.statusEffects = [];
+
 };
 
 Entity.prototype = {
@@ -2089,6 +2107,19 @@ Entity.prototype = {
 	 * @protected
 	 */
 	act: function() {
+
+		//Check if there should be status effects applied
+		if(this.statusEffects.length > 0){
+
+			//Loop through all status effects
+			for(var i = 0; i < this.statusEffects.length; i++){
+
+				//Apply the current status effect to this entity
+				this.statusEffects[i].update(this);
+
+			}
+
+		}
 
 		//If this is a player, lock the scheduler
 		if(this.hasComponent("keyboardControl")) {
@@ -2139,7 +2170,7 @@ Entity.prototype = {
 	 *
 	 * @param {String} name - The name of the component
 	 *
-	 * @return {Roguelike.Components} The component that this entity has
+	 * @return {Object} The component that this entity has
 	 */
 	getComponent: function(name) {
 
@@ -2151,7 +2182,7 @@ Entity.prototype = {
 	 * Add an existing component to this entity
 	 * @protected
 	 *
-	 * @param {Roguelike.Components} component - The component that is getting added to this entity
+	 * @param {Object} component - The component that is getting added to this entity
 	 */
 	addComponent: function(component) {
 
@@ -2164,12 +2195,109 @@ Entity.prototype = {
 	 * Remove a component from this entity
 	 * @protected
 	 *
-	 * @param {Roguelike.Components} component - The component that is getting removed from this entity
+	 * @param {Object} component - The component that is getting removed from this entity
 	 */
 	removeComponent: function(component) {
 
 		//Add the component
 		this.components[component.name] = undefined;
+
+	},
+
+	/**
+	 * Function to return every status effect currently on this entity
+	 * @protected
+	 *
+	 * @return {Array} An array filled with every status effect
+	 */
+	getStatusEffects: function(){
+
+		return this.statusEffects;
+
+	},
+
+	/**
+	 * Function to add a new status effect to this entity
+	 * @protected
+	 *
+	 * @param {Object} statusEffect - The status effect that is being added
+	 */
+	addStatusEffect: function(statusEffect){
+
+		//We start with the assumption that there isn't a similar status effect
+		var index = -1;
+
+		//Loop through each status effect on this entity
+		for(var i = 0; i < this.statusEffects.length; i++){
+
+			//If the name of this status effect matches the name of the effect being added
+			if(this.statusEffects[i].name === statusEffect.name){
+
+				//We have found our existing and duplicate status effect
+				index = i;
+
+				//Stop here because we aren't going to find more
+				break;
+
+			}
+
+		}
+
+		//If the status effect haas been found, we try to stack it
+		if(index !== -1){
+
+			//If we can stack the status effect
+			if(statusEffect.stackable === true){
+
+				//If the status effect should add it's turns left to the existing status effect or
+				//if it should reset the status effect back to it's original turns left
+				if(statusEffect.addStack === true){
+
+					//Add all new turns left to the existing status effect
+					this.statusEffects[index].turnsLeft += statusEffect.turnsLeft;
+
+				}else{
+
+					//Reset the turns left of the existing status effect to the default turns left provided by the new status effect
+					this.statusEffects[index].turnsLeft = statusEffect.turnsLeft;
+
+				}
+
+			}
+
+		}else{
+
+			//Add the status effect to the status effects array
+			this.statusEffects.push(statusEffect);
+
+		}
+
+
+	},
+
+	/**
+	 * Function to remove a status effect from this entity
+	 * @protected
+	 *
+	 * @param {Object} statusEffect - The status effect that is being removed
+	 *
+	 * @return {Boolean} Returns true when the status effect is removed, returns false when not
+	 */
+	removeStatusEffect: function(statusEffect){
+
+		//Try to find the element in the effects array
+		var index = this.statusEffects.indexOf(statusEffect);
+
+		//If the status effect isn't found, exit as soon as possible
+		if(index === -1) {
+			return false;
+		}
+
+		//The status effect has been found
+		this.statusEffects.splice(index, 1);
+
+		//We've made it all the way down here so the status effect is removed
+		return true;
 
 	}
 
@@ -2307,6 +2435,156 @@ module.exports = Group;
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
+//Require necessary modules
+var StatusEffect = require('./statuseffect.js');
+
+/**
+ * Fire Status Effect constructor
+ *
+ * @class StatusFire
+ * @classdesc Whenever an entity is on fire this status effect is applied to the entity
+ * Inherits from Status Effect
+ */
+var StatusFire = function() {
+
+	/**
+	 * Inherit the constructor from the Element class
+	 */
+	StatusEffect.call(this);
+
+	/**
+	 * @property {String} name - The name of this status effect. This field is always required!
+	 */
+	this.name = 'Fire';
+
+	/**
+	 * @property {Number} turnsLeft - The amount of turns this status effect is going to last
+	 */
+	this.turnsLeft = 5;
+
+	/**
+	 * @property {Boolean} stackable - Can this status effect be applied more than once
+	 */
+	this.stackable = false;
+
+	/**
+	 * @property {Boolean} addStack - If this effect is stackable, should the turns left be added or reset to it's default value
+	 */
+	this.addStack = false;
+
+};
+
+StatusFire.prototype = Object.create(StatusEffect.prototype, {
+
+	/**
+	 * Function that gets called whenever the game updates 1 tick
+	 * @protected
+	 *
+	 * @param {Entity} entity - The entity that is currently acting
+	 */
+	update: {
+
+		value: function(entity) {
+
+			//TODO: Make this the stats component, we don't want individual components for everything
+			//Get the correct components
+			var healthComponent = entity.getComponent('health');
+
+			//Damage the health component with the fire damage
+			healthComponent.takeDamage(5);
+
+			//Perform the base update
+			this.baseUpdate(entity);
+
+		}
+
+	}
+
+});
+
+//Export the Browserify module
+module.exports = StatusFire;
+
+},{"./statuseffect.js":24}],24:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+/**
+ * Status Effect constructor
+ *
+ * @class StatusEffect
+ * @classdesc The base class for status effects
+ */
+var StatusEffect = function() {
+
+	/**
+	 * @property {String} name - The name of this status effect. This field is always required!
+	 */
+	this.name = 'Base Effect';
+
+	/**
+	 * @property {Number} turnsLeft - The amount of turns this status effect is going to last
+	 */
+	this.turnsLeft = 0;
+
+	/**
+	 * @property {Boolean} stackable - Can this status effect be applied more than once
+	 */
+	this.stackable = false;
+
+	/**
+	 * @property {Boolean} addStack - If this effect is stackable, should the turns left be added or reset to it's default value
+	 */
+	this.addStack = false;
+
+};
+
+StatusEffect.prototype = {
+
+	/**
+	 * Function that gets called whenever the game updates 1 tick
+	 * This function should be overwritten by status effects
+	 * @protected
+	 *
+	 * @param {Entity} entity - The entity that is currently acting
+	 */
+	update: function(entity) {
+
+		//Perform the base update
+		this.baseUpdate(entity);
+
+	},
+
+	/**
+	 * Function that checks if this status effect should be removed already
+	 * @protected
+	 *
+	 * @param {Entity} entity - The entity that is currently acting
+	 */
+	baseUpdate: function(entity) {
+
+		//We have performed another turn
+		this.turnsLeft--;
+
+		//If there are zero turns left, remove this status effect
+		if(this.turnsLeft <= 0){
+
+			//Remove the status effect
+			entity.removeStatusEffect(this);
+
+		}
+
+	}
+
+};
+
+//Export the Browserify module
+module.exports = StatusEffect;
+
+},{}],25:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
 /**
  * Combat System constructor
  *
@@ -2408,7 +2686,7 @@ Combat.prototype = {
 //Export the Browserify module
 module.exports = Combat;
 
-},{}],24:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -2665,7 +2943,7 @@ LightMap.prototype = {
 //Export the Browserify module
 module.exports = LightMap;
 
-},{"../../geometry/vector2.js":30}],25:[function(require,module,exports){
+},{"../../geometry/vector2.js":32}],27:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -2846,7 +3124,7 @@ Movement.prototype = {
 //Export the Browserify module
 module.exports = Movement;
 
-},{}],26:[function(require,module,exports){
+},{}],28:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -2911,7 +3189,7 @@ Open.prototype = {
 module.exports = Open;
 
 
-},{}],27:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -3058,7 +3336,7 @@ module.exports = PathFinding;
 
 
 
-},{"../../geometry/vector2.js":30,"../../libraries/easystar.js":35}],28:[function(require,module,exports){
+},{"../../geometry/vector2.js":32,"../../libraries/easystar.js":37}],30:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -3282,16 +3560,35 @@ Render.prototype = {
 			//Loop through every vertical row
 			for(var y = 0; y < map.settings.tilesY; y++) {
 
-				//Draw the lightmap
-				if(map.tiles[x][y].explored === true && 1 - map.tiles[x][y].lightLevel > 0.7) {
+				//Calculate the render lightLevel based on the current lighlevel of a tile
+				if(map.tiles[x][y].renderLightLevel < map.tiles[x][y].lightLevel){
 
-					this.context.fillStyle = "rgba(0, 0, 0, 0.7)";
+					if((map.tiles[x][y].renderLightLevel + 0.02) > map.tiles[x][y].lightLevel){
 
-				}else{
+						map.tiles[x][y].renderLightLevel = map.tiles[x][y].lightLevel;
 
-					this.context.fillStyle = "rgba(0, 0, 0, " + (1 - map.tiles[x][y].lightLevel) + ")";
+					}else{
+
+						map.tiles[x][y].renderLightLevel += 0.02;
+
+					}
+
+				}else if(map.tiles[x][y].renderLightLevel > map.tiles[x][y].lightLevel && map.tiles[x][y].renderLightLevel > 0.3){
+
+					if((map.tiles[x][y].renderLightLevel - 0.001) < 0.3){
+
+						map.tiles[x][y].renderLightLevel = 0.3;
+
+					}else{
+
+						map.tiles[x][y].renderLightLevel -= 0.001;
+
+					}
 
 				}
+
+				//Draw the lightmap
+				this.context.fillStyle = "rgba(0, 0, 0, " + (1 - map.tiles[x][y].renderLightLevel) + ")";
 
 				//Create a rectangle!
 				this.context.fillRect(
@@ -3488,7 +3785,7 @@ Render.prototype = {
 module.exports = Render;
 
 
-},{"../../geometry/vector2.js":30}],29:[function(require,module,exports){
+},{"../../geometry/vector2.js":32}],31:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -3602,7 +3899,7 @@ Boundary.prototype = {
 //Export the Browserify module
 module.exports = Boundary;
 
-},{}],30:[function(require,module,exports){
+},{}],32:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -3723,7 +4020,7 @@ Vector2.prototype = {
 //Export the Browserify module
 module.exports = Vector2;
 
-},{}],31:[function(require,module,exports){
+},{}],33:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -3767,7 +4064,7 @@ window.addEventListener("load", Intialize);
 //Export the Browserify module
 module.exports = Intialize;
 
-},{"./core/game.js":2}],32:[function(require,module,exports){
+},{"./core/game.js":2}],34:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -3865,7 +4162,7 @@ Event.prototype = {
 //Export the Browserify module
 module.exports = Event;
 
-},{}],33:[function(require,module,exports){
+},{}],35:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -3981,7 +4278,7 @@ Key.prototype = {
 //Export the Browserify module
 module.exports = Key;
 
-},{"./event.js":32}],34:[function(require,module,exports){
+},{"./event.js":34}],36:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -4099,7 +4396,7 @@ Keyboard.prototype = {
 module.exports = Keyboard;
 
 
-},{"./key.js":33}],35:[function(require,module,exports){
+},{"./key.js":35}],37:[function(require,module,exports){
 //NameSpace
 var EasyStar = EasyStar || {};
 
@@ -4649,7 +4946,7 @@ if(typeof define === "function" && define.amd) {
 //Export the Browserify module
 module.exports = EasyStar;
 
-},{}],36:[function(require,module,exports){
+},{}],38:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -4872,7 +5169,7 @@ MersenneTwister.prototype.genrand_res53 = function() {
 //Export the Browserify module
 module.exports = MersenneTwister;
 
-},{}],37:[function(require,module,exports){
+},{}],39:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -5113,7 +5410,7 @@ Map.prototype = {
 //Export the Browserify module
 module.exports = Map;
 
-},{"./tile.js":41}],38:[function(require,module,exports){
+},{"./tile.js":43}],40:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -5525,7 +5822,7 @@ MapDecorator.prototype = {
 //Export the Browserify module
 module.exports = MapDecorator;
 
-},{"../core/utils.js":4,"../factories/decorationfactory.js":5,"../factories/enemyfactory.js":6,"../factories/propfactory.js":8,"../geometry/vector2.js":30}],39:[function(require,module,exports){
+},{"../core/utils.js":4,"../factories/decorationfactory.js":5,"../factories/enemyfactory.js":6,"../factories/propfactory.js":8,"../geometry/vector2.js":32}],41:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -6160,7 +6457,7 @@ MapFactory.prototype = {
 //Export the Browserify module
 module.exports = MapFactory;
 
-},{"../core/utils.js":4,"../factories/enemyfactory.js":6,"../geometry/vector2.js":30,"./room.js":40}],40:[function(require,module,exports){
+},{"../core/utils.js":4,"../factories/enemyfactory.js":6,"../geometry/vector2.js":32,"./room.js":42}],42:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -6325,7 +6622,7 @@ Room.prototype = {
 //Export the Browserify module
 module.exports = Room;
 
-},{"../core/utils.js":4,"../geometry/vector2.js":30,"./tile.js":41}],41:[function(require,module,exports){
+},{"../core/utils.js":4,"../geometry/vector2.js":32,"./tile.js":43}],43:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -6377,6 +6674,11 @@ var Tile = function(type, blockLight, room, tileRow, tileNumber) {
 	 * @property {Number} lightLevel - The brightness of the current tile
 	 */
 	this.lightLevel = 0;
+
+	/**
+	 * @property {Number} lightLevel - The brightness of the current tile that is being rendered
+	 */
+	this.renderLightLevel = 0;
 
 	/**
 	 * @property {Boolean} explored - Boolean if a tile has already been explorer by the player
@@ -6436,7 +6738,7 @@ Tile.prototype = {
 //Export the Browserify module
 module.exports = Tile;
 
-},{}],42:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -6602,7 +6904,7 @@ Queue.prototype = {
 module.exports = Queue;
 
 
-},{}],43:[function(require,module,exports){
+},{}],45:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -6843,7 +7145,7 @@ Scheduler.prototype = {
 //Export the Browserify module
 module.exports = Scheduler;
 
-},{"./queue.js":42}],44:[function(require,module,exports){
+},{"./queue.js":44}],46:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -6963,7 +7265,88 @@ Container.prototype = Object.create(Element.prototype, {
 //Export the Browserify module
 module.exports = Container;
 
-},{"./element.js":46}],45:[function(require,module,exports){
+},{"./element.js":49}],47:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+//Require necessary modules
+var Element = require('../element.js');
+
+/**
+ * UI Element Status Effects constructor
+ *
+ * @class TextLogElement
+ * @classdesc An object that is able to render every status effect on a certain entity
+ * Inherits from Element
+ *
+ * @param {Vector2} position - The position of this element
+ * @param {Object} parent - The parent of this element
+ * @param {Entity} target - Reference to the entity object
+ */
+var StatusEffects = function(position, parent, target) {
+
+	/**
+	 * Inherit the constructor from the Element class
+	 */
+	Element.call(this, position, parent);
+
+	/**
+	 * @property {Entity} target - Reference to the entity object
+	 */
+	this.target = target;
+
+};
+
+StatusEffects.prototype = Object.create(Element.prototype, {
+
+	render: {
+
+		/**
+		 * Calls the render function of each of the containers children
+		 * @protected
+		 *
+		 * @param {Object} context - Reference to the current canvas context
+		 * @param {Vector2} parentPosition - The position of the previous container that called this render function
+		 */
+		value: function(context, parentPosition) {
+
+			//Check if the container and it's children even need to be rendered
+			if(!this.visible) {
+				return;
+			}
+
+			//Create a new starting position using the provided position and the position of this container
+			var newPosition = parentPosition.combine(this.position);
+
+			//Grab all status effects from the target
+			var statusEffects = this.target.getStatusEffects();
+
+			//Loop through each status effect
+			for(var i = 0; i < statusEffects.length; i++) {
+
+				//Define the visual style of the text, font, color, etc
+				context.font = "14px arial";
+				context.fillStyle = "rgba(255, 255, 255, 1)";
+
+				//Draw the text on screen
+				context.fillText(
+					statusEffects[i].name + ": " + statusEffects[i].turnsLeft,
+					newPosition.x,
+					newPosition.y + (50 * i)
+				);
+
+			}
+
+		}
+
+	}
+
+});
+
+//Export the Browserify module
+module.exports = StatusEffects;
+
+},{"../element.js":49}],48:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -7074,7 +7457,7 @@ TextLogElement.prototype = Object.create(Element.prototype, {
 //Export the Browserify module
 module.exports = TextLogElement;
 
-},{"../element.js":46}],46:[function(require,module,exports){
+},{"../element.js":49}],49:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -7195,7 +7578,7 @@ Element.prototype = {
 //Export the Browserify module
 module.exports = Element;
 
-},{}],47:[function(require,module,exports){
+},{}],50:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -7271,7 +7654,7 @@ ImageElement.prototype = Object.create(Element.prototype, {
 //Export the Browserify module
 module.exports = ImageElement;
 
-},{"../element.js":46}],48:[function(require,module,exports){
+},{"../element.js":49}],51:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -7361,7 +7744,7 @@ TextElement.prototype = Object.create(Element.prototype, {
 module.exports = TextElement;
 
 
-},{"../element.js":46}],49:[function(require,module,exports){
+},{"../element.js":49}],52:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -7505,4 +7888,4 @@ InteractionManager.prototype = {
 //Export the Browserify module
 module.exports = InteractionManager;
 
-},{}]},{},[31])
+},{}]},{},[33]);
