@@ -1,0 +1,44 @@
+{"frames": {
+
+"grass_1.png":
+{
+	"frame": {"x":2,"y":38,"w":16,"h":16},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":16,"h":16},
+	"sourceSize": {"w":16,"h":16}
+},
+"grass_2.png":
+{
+	"frame": {"x":2,"y":56,"w":16,"h":12},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":0,"y":2,"w":16,"h":12},
+	"sourceSize": {"w":16,"h":16}
+},
+"grass_3.png":
+{
+	"frame": {"x":2,"y":20,"w":16,"h":16},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":16,"h":16},
+	"sourceSize": {"w":16,"h":16}
+},
+"grass_4.png":
+{
+	"frame": {"x":2,"y":2,"w":16,"h":16},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":16,"h":16},
+	"sourceSize": {"w":16,"h":16}
+}},
+"meta": {
+	"app": "http://www.codeandweb.com/texturepacker ",
+	"version": "1.0",
+	"image": "decoration.png",
+	"format": "RGBA8888",
+	"size": {"w":20,"h":70},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:9b4936091cd6ccbbeb67d5f36cabb42e:a909f8669c4c1ad9209d46faeead318e:71a88a4e163a50e8a1058bb24f5ae753$"
+}
+}
