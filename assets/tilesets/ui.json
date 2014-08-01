@@ -1,0 +1,28 @@
+{"frames": {
+
+"itemslot.png":
+{
+	"frame": {"x":16,"y":0,"w":14,"h":14},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":14,"h":14},
+	"sourceSize": {"w":14,"h":14}
+},
+"mousepointer.png":
+{
+	"frame": {"x":0,"y":0,"w":16,"h":16},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":0,"y":0,"w":16,"h":16},
+	"sourceSize": {"w":112,"h":64}
+}},
+"meta": {
+	"app": "http://www.codeandweb.com/texturepacker ",
+	"version": "1.0",
+	"image": "ui.png",
+	"format": "RGBA8888",
+	"size": {"w":30,"h":16},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:4ea39716b97f323c6efc1c26bf02f465:8d3d80b9452c4cf0be52309a275cc91f:5b04aa198265472a3c5f56958d78e97b$"
+}
+}
