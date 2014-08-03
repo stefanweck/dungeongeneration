@@ -22,19 +22,19 @@ var Camera = function(game, position) {
 	this.game = game;
 
 	/**
-	 * @property {Object} position - The x and y top left coordinates of this camera, in pixels
+	 * @property {Vector2} position - The x and y top left coordinates of this camera, in pixels
 	 */
 	this.position = position;
 
 	/**
 	 * @property {Number} viewportWidth - The width of the game's canvas, in pixels
 	 */
-	this.viewportWidth = game.settings.canvas.width;
+	this.viewportWidth = game.width;
 
 	/**
 	 * @property {Number} viewportHeight - The height of the game's canvas, in pixels
 	 */
-	this.viewportHeight = game.settings.canvas.height;
+	this.viewportHeight = game.height;
 
 	/**
 	 * @property {Number} minimumDistanceX - The minimal distance from horizontal borders before the camera starts to move, in pixels
@@ -55,8 +55,8 @@ var Camera = function(game, position) {
 	 * @property {Boundary} viewportBoundary - The boundary that represents the viewport
 	 */
 	this.viewportBoundary = new Boundary(
-		this.position.x * game.map.settings.tileSize,
-		this.position.y * game.map.settings.tileSize,
+		this.position.x * (game.settings.tileSize * this.game.settings.zoom),
+		this.position.y * (game.settings.tileSize * this.game.settings.zoom),
 		this.viewportWidth,
 		this.viewportHeight
 	);
@@ -67,8 +67,8 @@ var Camera = function(game, position) {
 	this.mapBoundary = new Boundary(
 		0,
 		0,
-		game.map.settings.tilesX * game.map.settings.tileSize,
-		game.map.settings.tilesY * game.map.settings.tileSize
+		game.settings.tilesX * (game.settings.tileSize * this.game.settings.zoom),
+		game.settings.tilesY * (game.settings.tileSize * this.game.settings.zoom)
 	);
 
 };
@@ -106,7 +106,7 @@ Camera.prototype = {
 		if(this.followObject !== null) {
 
 			//Define the variables needed for moving the camera
-			var tileSize = this.game.map.settings.tileSize;
+			var tileSize = this.game.map.settings.tileSize * this.game.settings.zoom;
 
 			//Calculate the center position of the object that we are following
 			var followCenterX = (this.followObject.position.x * tileSize) + (tileSize / 2);
@@ -177,34 +177,28 @@ Camera.prototype = {
 //Export the Browserify module
 module.exports = Camera;
 
-},{"../geometry/boundary.js":31}],2:[function(require,module,exports){
+},{"../geometry/boundary.js":30}],2:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
 //Require necessary modules
 var Utils = require('./utils.js'),
-	TextLog = require('./textlog.js'),
+	UI = require('../ui/ui.js'),
 	Camera = require('./camera.js'),
+	World = require('./world.js'),
 	Map = require('../tilemap/map.js'),
 	PlayerFactory = require('../factories/playerfactory.js'),
 	Vector2 = require('../geometry/vector2.js'),
-	Container = require('../ui/container.js'),
-	InteractionManager = require('../ui/interactionmanager.js'),
-	TextLogElement = require('../ui/custom/textlog.js'),
-	ImageElement = require('../ui/elements/imageelement.js'),
-	TextElement = require('../ui/elements/textelement.js'),
 	Group = require('../gameobjects/group.js'),
 	Combat = require('../gameobjects/systems/combat.js'),
 	LightMap = require('../gameobjects/systems/lightmap.js'),
 	Movement = require('../gameobjects/systems/movement.js'),
 	Open = require('../gameobjects/systems/open.js'),
 	PathFinding = require('../gameobjects/systems/pathfinding.js'),
-	Render = require('../gameobjects/systems/render.js'),
 	MapFactory = require('../tilemap/mapfactory.js'),
 	MapDecorator = require('../tilemap/mapdecorator.js'),
 	Scheduler = require('../time/scheduler.js'),
 	Keyboard = require('../input/keyboard.js'),
-	StatusEffects = require('../ui/custom/statuseffects.js'),
 	StatusFire = require('../gameobjects/statuseffects/fire.js');
 
 /**
@@ -227,6 +221,16 @@ var Game = function(userSettings) {
 	 * @property {Boolean} isActive - Boolean to see if the game is currently active
 	 */
 	this.isActive = false;
+
+	/**
+	 * @property {Number} width - The width of the game
+	 */
+	this.width = false;
+
+	/**
+	 * @property {Number} height - The height of the game
+	 */
+	this.height = false;
 
 	/**
 	 * @property {Map} map - Reference to the current map
@@ -264,48 +268,67 @@ var Game = function(userSettings) {
 	this.dynamicSystems = [];
 
 	/**
-	 * @property {Camera} camera - Reference to the camera
-	 */
-	this.camera = null;
-
-	/**
-	 * @property {Container} UI - Reference to the global UI container
-	 */
-	this.UI = null;
-
-	/**
-	 * @property {InteractionManager} interactionmanager - Reference to the interactionmanager
-	 */
-	this.interactionmanager = null;
-
-	/**
-	 * @property {TextLog} textLog - Reference to the TextLog object
-	 */
-	this.textLog = null;
-
-	/**
 	 * @property {Entity} player - Reference to the player object
 	 */
 	this.player = null;
 
 	/**
+	 * @property {World} world - Reference to the World object
+	 */
+	this.world = null;
+
+	/**
+	 * @property {UI} stage - The UI object
+	 */
+	this.UI = null;
+
+	/**
+	 * @property {PIXI.Stage} stage - The Pixi stage object
+	 */
+	this.stage = null;
+
+	/**
+	 * @property {PIXI.CanvasRenderer|PIXI.WebGLRenderer} renderer - The Pixi renderer
+	 */
+	this.renderer = null;
+
+	/**
 	 * @property {Object} settings - The default settings
 	 */
 	this.settings = {
-		canvas: null,
-		cameraBounds: false,
-		debug: false
+		tilesX: 60, //The number of horizontal tiles on this map
+		tilesY: 40, //The number of vertical tiles on this map
+		zoom: 3 //The scale of the map
 	};
 
 	//Extend the default settings with those of the user
 	this.settings = Utils.extend(this.settings, userSettings);
 
-	//Initialize itself
-	this.initialize();
+	//Load and then initialize itself
+	this.load();
 
 };
 
 Game.prototype = {
+
+	load: function() {
+
+		//Tell PIXI.js to scale the images with Nearest Neighbour and not Linear
+		PIXI.scaleModes.DEFAULT = PIXI.scaleModes.NEAREST;
+
+		//Create an array with all assets that need to be loaded
+		var assetsToLoader = ["assets/tilesets/dungeon.json", "assets/sprites/entities.json", "assets/tilesets/decoration.json", "assets/tilesets/ui.json"];
+
+		//Create a new PIXI.AssetLoader object
+		var loader = new PIXI.AssetLoader(assetsToLoader);
+
+		//Define the callback when the loader has finished
+		loader.onComplete = this.initialize.bind(this);
+
+		//Start loading the assets
+		loader.load();
+
+	},
 
 	/**
 	 * Initialize the game, create all objects
@@ -318,6 +341,25 @@ Game.prototype = {
 			return;
 		}
 
+		//Set the width and height of the game
+		this.width = window.innerWidth;
+		this.height = window.innerHeight;
+
+		//Create the PIXI stage object
+		this.stage = new PIXI.Stage(0x000000);
+
+		//Auto detect the best renderer
+		this.renderer = PIXI.autoDetectRenderer(this.width, this.height);
+
+		//Add the renderer view element to the DOM
+		document.body.appendChild(this.renderer.view);
+
+		//Create the world object
+		this.world = new World(this);
+
+		//Initialize the UI container and all UI objects
+		this.UI = new UI(this);
+
 		//Create a new keyboard
 		this.keyboard = new Keyboard();
 
@@ -326,9 +368,6 @@ Game.prototype = {
 
 		//Initialize the map
 		this.initializeMap();
-
-		//Create the camera object
-		this.camera = new Camera(this, {x: 0, y: 0});
 
 		//Get the start position of the player
 		var playerPosition = new Vector2(this.map.entrance.x, this.map.entrance.y);
@@ -361,22 +400,6 @@ Game.prototype = {
 
 		//Add all systems to the game that need to be looped
 		this.dynamicSystems.push(new LightMap(this));
-		this.dynamicSystems.push(new Render(this));
-
-		//Create a new text log
-		this.textLog = new TextLog();
-
-		//Add another string to the message
-		var textLogMessage = "You enter the basement and look around";
-
-		//Add the message to the textlog
-		this.textLog.addMessage(textLogMessage);
-
-		//Create a new interaction manager
-		this.interactionmanager = new InteractionManager(this.settings.canvas);
-
-		//Initialize the UI
-		this.initializeUI();
 
 		//Update the game for the first time
 		this.update();
@@ -410,7 +433,11 @@ Game.prototype = {
 		//Generate rooms for this map
 		this.mapFactory.generateRooms();
 
+		//Decorate the map
 		this.mapDecorator.decorateMap();
+
+		//Add the entities group to the world
+		this.world.addChild(this.map.entities);
 
 	},
 
@@ -446,109 +473,7 @@ Game.prototype = {
 		this.scheduler.add(this.player, true);
 
 		//Let the camera follow the player entity
-		this.camera.follow(this.player, this.settings.canvas.width / 2, this.settings.canvas.height / 2);
-
-	},
-
-	/**
-	 * Creates all UI objects and adds them to the global UI container
-	 * @protected
-	 */
-	initializeUI: function() {
-
-		//Create the global UI container
-		var UI = new Container(
-			new Vector2(0, 0),
-			null
-		);
-
-		//Store the UI in the game object
-		this.UI = UI;
-
-		//Create the textlog
-		var textLog = new TextLogElement(
-			new Vector2(15, 15),
-			UI,
-			this
-		);
-
-		//Add the textlog to the UI
-		this.UI.addElement(textLog);
-
-		//Create the bottom bar container
-		var bottomBar = new Container(
-			new Vector2((this.settings.canvas.width / 2) - 418, this.settings.canvas.height - 100),
-			UI,
-			940,
-			100
-		);
-
-		//Loop 9 times to create all the left slots
-		for(var i = 0; i < 18; i++) {
-
-			//The default distance is 0
-			var distance = 0;
-
-			//And we only add it whenever we are starting at the second bar of quick slots
-			if(i > 8) {
-				distance = 48;
-			}
-
-			//Create the item slot container
-			var iconSlot = new Container(
-				new Vector2(i * 44 + distance, 15),
-				bottomBar,
-				44,
-				44
-			);
-
-			//Add the background image
-			iconSlot.addElement(
-				new ImageElement(
-					new Vector2(0, 0),
-					iconSlot,
-					"itemslot",
-					3
-				)
-			);
-
-			//Create the little text in the corner
-			iconSlot.addElement(
-				new TextElement(
-					new Vector2(28, 28),
-					iconSlot,
-					i + 1,
-					"#606060",
-					10
-				)
-			);
-
-			//Add a function the onHover object from the item slot container
-			iconSlot.onClick = function(index) {
-				return function() {
-					console.log("Quickslot number " + index);
-				};
-			}(i + 1);
-
-			//Add the slot to the bottom bar
-			bottomBar.addElement(iconSlot);
-
-			//Add the iconSlot to the interactive elements list
-			this.interactionmanager.elements.push(iconSlot);
-
-		}
-
-		//Add the bottom bar to the UI
-		this.UI.addElement(bottomBar);
-
-		var statusEffects = new StatusEffects(
-			new Vector2(15, 150),
-			UI,
-			this.player
-		);
-
-		//Add the status effects to the UI
-		this.UI.addElement(statusEffects);
+		this.world.camera.follow(this.player, this.width / 2, this.height / 2);
 
 	},
 
@@ -558,6 +483,9 @@ Game.prototype = {
 	 * @protected
 	 */
 	update: function() {
+
+		//Start measuring the FPS
+		this.UI.stats.begin();
 
 		//If the game is not currently active, restart
 		if(this.isInitialized && !this.isActive) {
@@ -585,6 +513,17 @@ Game.prototype = {
 
 		}
 
+		//Update the camera
+		this.world.camera.update();
+
+		//Scroll the map accordingly to the camera's position
+		this.world.position = new PIXI.Point(-this.world.camera.position.x, -this.world.camera.position.y);
+
+		//Render the stage
+		this.renderer.render(this.stage);
+
+		//Stop measuring the FPS
+		this.UI.stats.end();
 
 	},
 
@@ -618,74 +557,16 @@ Game.prototype = {
 //Export the Browserify module
 module.exports = Game;
 
-},{"../factories/playerfactory.js":7,"../gameobjects/group.js":22,"../gameobjects/statuseffects/fire.js":23,"../gameobjects/systems/combat.js":25,"../gameobjects/systems/lightmap.js":26,"../gameobjects/systems/movement.js":27,"../gameobjects/systems/open.js":28,"../gameobjects/systems/pathfinding.js":29,"../gameobjects/systems/render.js":30,"../geometry/vector2.js":32,"../input/keyboard.js":36,"../tilemap/map.js":39,"../tilemap/mapdecorator.js":40,"../tilemap/mapfactory.js":41,"../time/scheduler.js":45,"../ui/container.js":46,"../ui/custom/statuseffects.js":47,"../ui/custom/textlog.js":48,"../ui/elements/imageelement.js":50,"../ui/elements/textelement.js":51,"../ui/interactionmanager.js":52,"./camera.js":1,"./textlog.js":3,"./utils.js":4}],3:[function(require,module,exports){
-//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
-'use strict';
-
-/**
- * TextLog constructor
- *
- * @class TextLog
- * @classdesc The TextLog holds and stores all messages that entities send to it
- */
-var TextLog = function() {
-
-	/**
-	 * @property {Array} messages - An array filled with all text log messages
-	 */
-	this.messages = [];
-
-};
-
-TextLog.prototype = {
-
-	/**
-	 * Function to add a new message to the text log
-	 * @protected
-	 *
-	 * @param {String} message - The message that has to be stored
-	 */
-	addMessage: function(message) {
-
-		//Add the new message
-		this.messages.push(message);
-
-	},
-
-	/**
-	 * Function that returns all messages
-	 * @protected
-	 *
-	 * @return {Array} The array with all messages
-	 */
-	getMessages: function() {
-
-		//Return all messages
-		return this.messages;
-
-	},
-
-	/**
-	 * Clear all messages stored in the textlog
-	 * @protected
-	 */
-	clear: function(){
-
-		this.messages = [];
-
-	}
-
-};
-
-//Export the Browserify module
-module.exports = TextLog;
-
-},{}],4:[function(require,module,exports){
+},{"../factories/playerfactory.js":7,"../gameobjects/group.js":22,"../gameobjects/statuseffects/fire.js":23,"../gameobjects/systems/combat.js":25,"../gameobjects/systems/lightmap.js":26,"../gameobjects/systems/movement.js":27,"../gameobjects/systems/open.js":28,"../gameobjects/systems/pathfinding.js":29,"../geometry/vector2.js":31,"../input/keyboard.js":35,"../tilemap/map.js":38,"../tilemap/mapdecorator.js":39,"../tilemap/mapfactory.js":40,"../time/scheduler.js":44,"../ui/ui.js":49,"./camera.js":1,"./utils.js":3,"./world.js":4}],3:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
 //Require necessary modules
 var MersenneTwister = require('../libraries/mersennetwister.js');
+
+//Calculate a seed and log it for debugging purposes
+var seed = Math.floor(Math.random() * (500 - 1 + 1) + 1);
+console.log("Map Seed: " + seed);
 
 /**
  * Static Utilities Class
@@ -696,11 +577,8 @@ var MersenneTwister = require('../libraries/mersennetwister.js');
  */
 var Utils = {
 
-	//Create a new random seed
-	seed: Math.floor(Math.random() * (500 - 1 + 1) + 1),
-
 	//Create a new instance of the Mersenne Twister
-	mersenneTwister: new MersenneTwister(this.seed),
+	mersenneTwister: new MersenneTwister(seed),
 
 	/**
 	 * Function to generate a random number between two values
@@ -751,15 +629,78 @@ var Utils = {
 //Export the Browserify module
 module.exports = Utils;
 
-},{"../libraries/mersennetwister.js":38}],5:[function(require,module,exports){
+},{"../libraries/mersennetwister.js":37}],4:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+//Require necessary modules
+var Camera = require('./camera.js'),
+	Vector2 = require('../geometry/vector2.js');
+
+/**
+ * World constructor
+ *
+ * @class World
+ * @classdesc The World object holds all objects that are in the game world, entities, the map etc.
+ * They all move according to the camera
+ * Inherits from PIXI.DisplayObjectContainer
+ *
+ * @param {Game} game - Reference to the currently running game
+ */
+var World = function(game) {
+
+	/**
+	 * Inherit the constructor from the PIXI.DisplayObjectContainer object
+	 */
+	PIXI.DisplayObjectContainer.call(this);
+
+	/**
+	 * @property {Game} game - Reference to the current game object
+	 */
+	this.game = game;
+
+	/**
+	 * @property {Camera} camera - Reference to the camera
+	 */
+	this.camera = null;
+
+	//Initialize itself
+	this.initialize();
+
+};
+
+//Inherit the prototype from the PIXI.DisplayObjectContainer
+World.prototype = Object.create(PIXI.DisplayObjectContainer.prototype);
+World.prototype.constructor = World;
+
+/**
+ * Initialize the UI elements and add them to this container
+ * @protected
+ */
+World.prototype.initialize = function() {
+
+	//Create the camera object
+	this.camera = new Camera(this.game, new Vector2(0, 0));
+
+	//Scale the entire world
+	this.scale = new PIXI.Point(this.game.settings.zoom, this.game.settings.zoom);
+
+	//Add the container object to the stage
+	this.game.stage.addChild(this);
+
+};
+
+//Export the Browserify module
+module.exports = World;
+
+},{"../geometry/vector2.js":31,"./camera.js":1}],5:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
 //Require necessary modules
 var Entity = require('../gameobjects/entity.js'),
 	Position = require('../gameobjects/components/position.js'),
-	Utils = require('../core/utils.js'),
-	Sprite = require('../gameobjects/components/sprite.js');
+	Utils = require('../core/utils.js');
 
 /**
  * @class DecorationFactory
@@ -780,13 +721,10 @@ var DecorationFactory = {
 	newGrass: function(game, position) {
 
 		//Create the entity
-		var entity = new Entity(game, "Grass");
+		var entity = new Entity(game, "Grass", "grass_" + Utils.randomNumber(1, 4) + ".png");
 
 		//The starting position of the entity
 		entity.addComponent(new Position(position));
-
-		//The entity has a sprite ( color for now )
-		entity.addComponent(new Sprite("decoration", 0, Utils.randomNumber(3, 5)));
 
 		//Return the entity
 		return entity;
@@ -798,7 +736,7 @@ var DecorationFactory = {
 //Export the Browserify module
 module.exports = DecorationFactory;
 
-},{"../core/utils.js":4,"../gameobjects/components/position.js":17,"../gameobjects/components/sprite.js":18,"../gameobjects/entity.js":21}],6:[function(require,module,exports){
+},{"../core/utils.js":3,"../gameobjects/components/position.js":18,"../gameobjects/entity.js":21}],6:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -812,8 +750,7 @@ var Entity = require('../gameobjects/entity.js'),
 	CanFight = require('../gameobjects/components/canfight.js'),
 	Weapon = require('../gameobjects/components/weapon.js'),
 	MovementComponent = require('../gameobjects/components/movement.js'),
-	Tooltip = require('../gameobjects/components/tooltip.js'),
-	Sprite = require('../gameobjects/components/sprite.js');
+	Tooltip = require('../gameobjects/components/tooltip.js');
 
 /**
  * @class EnemyFactory
@@ -834,16 +771,13 @@ var EnemyFactory = {
 	newSpider: function(game, position) {
 
 		//Create the entity
-		var entity = new Entity(game, "Quick Spider", 2000);
+		var entity = new Entity(game, "Quick Spider", "spider_small_right.png", 2000);
 
 		//Give the entity a health of 100 points
 		entity.addComponent(new Health(20));
 
 		//The starting position of the entity
 		entity.addComponent(new Position(position));
-
-		//The entity has a sprite
-		entity.addComponent(new Sprite("entities", 1, 2));
 
 		//You can collide with this entity
 		entity.addComponent(new Collide(true));
@@ -864,7 +798,6 @@ var EnemyFactory = {
 
 		//Add a tooltip to this entity
 		entity.addComponent(new Tooltip(
-			game.settings.canvas,
 			entity.name,
 			"Arachnid Enemy",
 			"The quick spider is twice as fast as you and will definitely attack you. It's just programmed to do so."
@@ -887,16 +820,13 @@ var EnemyFactory = {
 	newSkeleton: function(game, position) {
 
 		//Create the entity
-		var entity = new Entity(game, "Skeleton", 1000);
+		var entity = new Entity(game, "Skeleton", "skeleton_right.png", 1000);
 
 		//Give the entity a health of 100 points
 		entity.addComponent(new Health(50));
 
 		//The starting position of the entity
 		entity.addComponent(new Position(position));
-
-		//The entity has a sprite
-		entity.addComponent(new Sprite("entities", 2, 0));
 
 		//You can collide with this entity
 		entity.addComponent(new Collide(true));
@@ -917,7 +847,6 @@ var EnemyFactory = {
 
 		//Add a tooltip to this entity
 		entity.addComponent(new Tooltip(
-			game.settings.canvas,
 			entity.name,
 			"Undead Enemy",
 			"The skeleton is a very dangerous but unstable enemy. If you stab just right his bones will collapse."
@@ -933,7 +862,7 @@ var EnemyFactory = {
 //Export the Browserify module
 module.exports = EnemyFactory;
 
-},{"../gameobjects/behaviours/moveBehaviours.js":9,"../gameobjects/components/canfight.js":10,"../gameobjects/components/canopen.js":11,"../gameobjects/components/collide.js":12,"../gameobjects/components/health.js":13,"../gameobjects/components/movement.js":16,"../gameobjects/components/position.js":17,"../gameobjects/components/sprite.js":18,"../gameobjects/components/tooltip.js":19,"../gameobjects/components/weapon.js":20,"../gameobjects/entity.js":21}],7:[function(require,module,exports){
+},{"../gameobjects/behaviours/moveBehaviours.js":9,"../gameobjects/components/canfight.js":10,"../gameobjects/components/canopen.js":11,"../gameobjects/components/collide.js":12,"../gameobjects/components/health.js":13,"../gameobjects/components/movement.js":17,"../gameobjects/components/position.js":18,"../gameobjects/components/tooltip.js":19,"../gameobjects/components/weapon.js":20,"../gameobjects/entity.js":21}],7:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -946,7 +875,7 @@ var Entity = require('../gameobjects/entity.js'),
 	KeyboardControl = require('../gameobjects/components/keyboardcontrol.js'),
 	CanFight = require('../gameobjects/components/canfight.js'),
 	Tooltip = require('../gameobjects/components/tooltip.js'),
-	Sprite = require('../gameobjects/components/sprite.js'),
+	Inventory = require('../gameobjects/components/inventory.js'),
 	Position = require('../gameobjects/components/position.js');
 
 /**
@@ -969,16 +898,13 @@ var PlayerFactory = {
 	newPlayerWarrior: function(game, position, controls) {
 
 		//Create the entity
-		var entity = new Entity(game, "You", 1000);
+		var entity = new Entity(game, "You", "warrior_right.png", 1000);
 
 		//Give the player a health of 100 points
 		entity.addComponent(new Health(100));
 
 		//The starting position of the player is at the dungeon's entrance
 		entity.addComponent(new Position(position));
-
-		//The player has a sprite
-		entity.addComponent(new Sprite("entities", 0, 0));
 
 		//The player must be controllable by the keyboards arrow keys
 		entity.addComponent(new KeyboardControl(
@@ -993,6 +919,9 @@ var PlayerFactory = {
 		//You can collide with this entity
 		entity.addComponent(new Collide(true));
 
+		//This entity has an inventory
+		entity.addComponent(new Inventory());
+
 		//The entity has a weapon
 		//TODO: Change this to a loadout. Something that says: Hey you are wearing this and this and this
 		entity.addComponent(new Weapon(7));
@@ -1002,7 +931,6 @@ var PlayerFactory = {
 
 		//Add a tooltip to this entity
 		entity.addComponent(new Tooltip(
-			game.settings.canvas,
 			"Player",
 			"",
 			""
@@ -1018,7 +946,7 @@ var PlayerFactory = {
 //Export the Browserify module
 module.exports = PlayerFactory;
 
-},{"../gameobjects/components/canfight.js":10,"../gameobjects/components/collide.js":12,"../gameobjects/components/health.js":13,"../gameobjects/components/keyboardcontrol.js":14,"../gameobjects/components/lightsource.js":15,"../gameobjects/components/position.js":17,"../gameobjects/components/sprite.js":18,"../gameobjects/components/tooltip.js":19,"../gameobjects/components/weapon.js":20,"../gameobjects/entity.js":21}],8:[function(require,module,exports){
+},{"../gameobjects/components/canfight.js":10,"../gameobjects/components/collide.js":12,"../gameobjects/components/health.js":13,"../gameobjects/components/inventory.js":14,"../gameobjects/components/keyboardcontrol.js":15,"../gameobjects/components/lightsource.js":16,"../gameobjects/components/position.js":18,"../gameobjects/components/tooltip.js":19,"../gameobjects/components/weapon.js":20,"../gameobjects/entity.js":21}],8:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -1027,8 +955,7 @@ var Entity = require('../gameobjects/entity.js'),
 	Position = require('../gameobjects/components/position.js'),
 	CanOpen = require('../gameobjects/components/canopen.js'),
 	Collide = require('../gameobjects/components/collide.js'),
-	Tooltip = require('../gameobjects/components/tooltip.js'),
-	Sprite = require('../gameobjects/components/sprite.js');
+	Tooltip = require('../gameobjects/components/tooltip.js');
 
 /**
  * @class PropFactory
@@ -1049,13 +976,10 @@ var PropFactory = {
 	newEntrance: function(game, position) {
 
 		//Create the entity
-		var entity = new Entity(game, "Entrance");
+		var entity = new Entity(game, "Entrance", "stairs_down.png");
 
 		//The starting position of the entity
 		entity.addComponent(new Position(position));
-
-		//The entity has a sprite ( color for now )
-		entity.addComponent(new Sprite("tileset", 3, 1));
 
 		//Return the entity
 		return entity;
@@ -1074,13 +998,10 @@ var PropFactory = {
 	newExit: function(game, position) {
 
 		//Create the entity
-		var entity = new Entity(game, "Exit");
+		var entity = new Entity(game, "Exit", "stairs_up.png");
 
 		//The starting position of the entity
 		entity.addComponent(new Position(position));
-
-		//The entity has a sprite ( color for now )
-		entity.addComponent(new Sprite("tileset", 3, 0));
 
 		//Return the entity
 		return entity;
@@ -1099,13 +1020,10 @@ var PropFactory = {
 	newDoor: function(game, position) {
 
 		//Create the entity
-		var entity = new Entity(game, "Wooden Door");
+		var entity = new Entity(game, "Wooden Door", "door_horizontal_closed.png");
 
 		//The starting position of the entity
 		entity.addComponent(new Position(position));
-
-		//The entity has a sprite ( color for now )
-		entity.addComponent(new Sprite("tileset", 2, 2));
 
 		//This entity can be opened up by another entity
 		entity.addComponent(new CanOpen(game, entity));
@@ -1115,7 +1033,6 @@ var PropFactory = {
 
 		//Add a tooltip to this entity
 		entity.addComponent(new Tooltip(
-			game.settings.canvas,
 			entity.name,
 			"Closed",
 			""
@@ -1131,7 +1048,7 @@ var PropFactory = {
 //Export the Browserify module
 module.exports = PropFactory;
 
-},{"../gameobjects/components/canopen.js":11,"../gameobjects/components/collide.js":12,"../gameobjects/components/position.js":17,"../gameobjects/components/sprite.js":18,"../gameobjects/components/tooltip.js":19,"../gameobjects/entity.js":21}],9:[function(require,module,exports){
+},{"../gameobjects/components/canopen.js":11,"../gameobjects/components/collide.js":12,"../gameobjects/components/position.js":18,"../gameobjects/components/tooltip.js":19,"../gameobjects/entity.js":21}],9:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -1253,7 +1170,7 @@ CanFight.prototype = {
 //Export the Browserify module
 module.exports = CanFight;
 
-},{"../../input/event.js":34}],11:[function(require,module,exports){
+},{"../../input/event.js":33}],11:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -1331,7 +1248,7 @@ CanOpen.prototype = {
 //Export the Browserify module
 module.exports = CanOpen;
 
-},{"../../input/event.js":34}],12:[function(require,module,exports){
+},{"../../input/event.js":33}],12:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -1454,6 +1371,64 @@ Health.prototype = {
 module.exports = Health;
 
 },{}],14:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+/**
+ * Inventory Component constructor
+ *
+ * @class Inventory
+ * @classdesc The Inventory component is responsible for keeping track of what an entity carries along with him
+ *
+ * @param {Number} maxHealth - The new and maximum health of the entity
+ */
+var Inventory = function(maxHealth) {
+
+	/**
+	 * @property {String} name - The name of this system. This field is always required!
+	 */
+	this.name = 'inventory';
+
+	/**
+	 * @property {Number} minHealth - The minimum health of the entity
+	 */
+	this.maxSlots = 0;
+
+	/**
+	 * @property {Array} slots - An array that holds all items in this inventory
+	 */
+	this.slots = [];
+
+};
+
+Inventory.prototype = {
+
+	/**
+	 * Add a new item to the inventory
+	 * @protected
+	 */
+	add: function(item){
+
+		this.slots.push(item);
+
+	},
+
+	/**
+	 * Function to clear the entire inventory
+	 * @protected
+	 */
+	clear: function(){
+
+		this.slots = [];
+
+	}
+
+};
+
+//Export the Browserify module
+module.exports = Inventory;
+
+},{}],15:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -1632,7 +1607,7 @@ KeyboardControl.prototype = {
 module.exports = KeyboardControl;
 
 
-},{"../../geometry/vector2.js":32}],15:[function(require,module,exports){
+},{"../../geometry/vector2.js":31}],16:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -1667,7 +1642,7 @@ var LightSource = function(gradient, radius) {
 //Export the Browserify module
 module.exports = LightSource;
 
-},{}],16:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -1723,7 +1698,7 @@ MovementComponent.prototype = {
 //Export the Browserify module
 module.exports = MovementComponent;
 
-},{}],17:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -1752,86 +1727,6 @@ var Position = function(position) {
 //Export the Browserify module
 module.exports = Position;
 
-},{}],18:[function(require,module,exports){
-//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
-'use strict';
-
-/**
- * Sprite Component constructor
- *
- * @class Sprite
- * @classdesc Determines how an entity looks!
- *
- * @param {String} sprite - The string of the sprite that is being used
- * @param {Number} row - The row that the sprite is on, on the tileset
- * @param {Number} tile - The specific tile that the sprite is on, on the tileset
- * @param {Object} offset - Optional object that described he horizontal and vertical offset of this sprite
- */
-var Sprite = function(sprite, row, tile, offset) {
-
-	/**
-	 * @property {String} name - The name of this system. This field is always required!
-	 */
-	this.name = 'sprite';
-
-	/**
-	 * @property {String} sprite - The sprite image of this entity
-	 */
-	this.sprite = sprite;
-
-	/**
-	 * @property {Number} row - The row that the sprite is on, on the tileset
-	 */
-	this.row = row;
-
-	/**
-	 * @property {Number} tile - The specific tile that the sprite is on, on the tileset
-	 */
-	this.tile = tile;
-
-	/**
-	 * @property {Object} offset - The horizontal and vertical offset of this sprite, used for example to render something a little above of below it's position
-	 */
-	this.offset = offset || {x: 0, y: 0};
-
-	/**
-	 * @property {String} direction - The direction this sprite is facing. Left, right, up, down.
-	 */
-	this.direction = "right";
-
-};
-
-Sprite.prototype = {
-
-	/**
-	 * Return the tile that should be rendered, based on the direction
-	 * @protected
-	 *
-	 * @return {Number} Returns the tile number
-	 */
-	getTileNumber: function() {
-
-		//Switch between all possible directions
-		switch(this.direction) {
-
-			default:
-			case("right"):
-
-				return this.tile;
-
-			case("left"):
-
-				return this.tile + 1;
-
-		}
-
-	}
-
-};
-
-//Export the Browserify module
-module.exports = Sprite;
-
 },{}],19:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
@@ -1843,12 +1738,11 @@ module.exports = Sprite;
  * @classdesc A tooltip that will show up when the player hovers his mouse over the entity
  *
  * /**
- * @param {Object} canvas - The current canvas object
  * @param {String} title - The title of the tooltip
  * @param {String} type - The type of entity
  * @param {String} description - The description of this entity
  */
-var Tooltip = function(canvas, title, type, description) {
+var Tooltip = function(title, type, description) {
 
 	/**
 	 * @property {String} name - The name of this system. This field is always required!
@@ -1856,170 +1750,19 @@ var Tooltip = function(canvas, title, type, description) {
 	this.name = 'tooltip';
 
 	/**
-	 * @property {Object} context - The 2D context of the current canvas object
-	 */
-	this.context = canvas.getContext("2d");
-
-	/**
-	 * @property {Number} width - The width of the tooltip
-	 */
-	this.width = 150;
-
-	/**
-	 * @property {Number} maxWidth - The maximum width of the tooltip
-	 */
-	this.maxWidth = 0;
-
-	/**
-	 * @property {Number} fontSize - The size of the font in this tooltip
-	 */
-	this.fontSize = 12;
-
-	/**
-	 * @property {String} font - The font used in the tooltips
-	 */
-	this.font = "Courier New";
-
-	/**
 	 * @property {Array} title - The title of the tooltip
 	 */
-	this.title = this.splitText(title, this.context);
+	this.title = title;
 
 	/**
 	 * @property {Array} type - The type of entity
 	 */
-	this.type = this.splitText(type, this.context);
+	this.type = type;
 
 	/**
 	 * @property {Array} description - The description of this entity
 	 */
-	this.description = this.splitText(description, this.context);
-
-};
-
-Tooltip.prototype = {
-
-	/**
-	 * Splits up a sentence in words and measures how many words can fit on one line
-	 * It then divides the words over multiple lines
-	 * @protected
-	 *
-	 * @param {String} text - The text to be split up into multiple lines
-	 * @param {Object} context - The 2D context of the current canvas object
-	 *
-	 * @return {Array} Returns an array with all the separate lines of text
-	 */
-	splitText: function(text, context) {
-
-		//If there isn't any text, return an empty array
-		if(text === "") {
-			return [];
-		}
-
-		//Define variables
-		var words = text.split(' ');
-		var lines = [];
-		var currentLine = "";
-
-		//Set the current fontsize to the context of the canvas
-		context.font = this.fontSize + "px " + this.font;
-
-		//If the text doesn't exceed the maximum width, don't bother splitting it up in separate lines
-		if(context.measureText(text).width < this.width) {
-
-			//Check if the current line is the longest line
-			this.checkLongestLine(text);
-
-			//Return the text in an array
-			return [text];
-
-		}
-
-		//If we reached this point that means the maximum width is has been reached, we have to split up the sentence
-		while(words.length > 0) {
-
-			//Define variables
-			var newSentence;
-
-			//Check if we have to add an extra space at the beginning
-			if(currentLine === "") {
-
-				newSentence = words[0];
-
-			}else{
-
-				//Create what should be the new sentence
-				newSentence = currentLine + " " + words[0];
-
-			}
-
-			///Check if the new sentence exceeds the maximum width
-			if(context.measureText(newSentence).width < this.width) {
-
-				//Create what should be the new sentence
-				if(currentLine === "") {
-
-					//We don't exceed the maximum width so we can add the word to the currentLine
-					currentLine += words.splice(0, 1);
-
-				}else{
-
-					//We don't exceed the maximum width so we can add the word to the currentLine
-					currentLine += " " + words.splice(0, 1);
-
-				}
-
-			}else{
-
-				//Check if the current line is the longest line
-				this.checkLongestLine(currentLine);
-
-				//We exceed the maximum width so the new word has to be placed on a new line
-				lines.push(currentLine);
-
-				//Clear the current line again
-				currentLine = "";
-
-			}
-
-			//If there aren't any words left, we push whatever is left in the current line to the lines array
-			if(words.length === 0 && currentLine.length > 0) {
-
-				//Check if the current line is the longest line
-				this.checkLongestLine(currentLine);
-
-				lines.push(currentLine);
-
-			}
-
-		}
-
-		//Return the array of lines
-		return lines;
-
-	},
-
-	/**
-	 * Checks if a string is longer than any string checked before.
-	 * This way I can use the longest string for rendering the tooltips background
-	 * @protected
-	 *
-	 * @param {String} text - The text to be measured
-	 */
-	checkLongestLine: function(text) {
-
-		//Measure the length of the supplied text
-		var textLength = this.context.measureText(text).width;
-
-		//If the text is longer than the longest line
-		if(textLength > this.maxWidth) {
-
-			//Then this will be the new longest line
-			this.maxWidth = textLength;
-
-		}
-
-	}
+	this.description = description;
 
 };
 
@@ -2068,9 +1811,10 @@ module.exports = Weapon;
  *
  * @param {Game} game - Reference to the currently running game
  * @param {String} name - The name of this entity
+ * @param {String} sprite - The name of the sprite used by this entity
  * @param {Number} speed - The speed of this entity
  */
-var Entity = function(game, name, speed) {
+var Entity = function(game, name, sprite, speed) {
 
 	/**
 	 * @property {Game} game - Reference to the current game object
@@ -2086,6 +1830,16 @@ var Entity = function(game, name, speed) {
 	 * @property {Number} speed - The speed of this entity
 	 */
 	this.speed = speed || 1000;
+
+	/**
+	 * @property {String} textureName - The name of the sprite of this entity
+	 */
+	this.textureName = sprite;
+
+	/**
+	 * @property {PIXI.Sprite} sprite - The sprite of this entity
+	 */
+	this.sprite = PIXI.Sprite.fromFrame(sprite);
 
 	/**
 	 * @property {Object} components - An object filled with all the components this entity has
@@ -2318,10 +2072,16 @@ var Entity = require('../gameobjects/entity.js');
  *
  * @class Group
  * @classdesc The object that holds multiple entities and is able to search them
+ * Inherits from PIXI.DisplayObjectContainer
  *
  * @param {Game} game - A reference to the current game object
  */
 var Group = function(game) {
+
+	/**
+	 * Inherit the constructor from the PIXI.DisplayObjectContainer object
+	 */
+	PIXI.DisplayObjectContainer.call(this);
 
 	/**
 	 * @property {Game} game - Reference to the current game object
@@ -2335,96 +2095,119 @@ var Group = function(game) {
 
 };
 
-Group.prototype = {
+//Inherit the prototype from the PIXI.DisplayObjectContainer
+Group.prototype = Object.create(PIXI.DisplayObjectContainer.prototype);
+Group.prototype.constructor = Group;
 
-	/**
-	 * Function to add a new entity to this group
-	 * @protected
-	 *
-	 * @param {Entity} entity - A reference to entity being added
-	 */
-	addEntity: function(entity) {
+/**
+ * Function to add a new entity to this group
+ * @protected
+ *
+ * @param {Entity} entity - A reference to entity being added
+ */
+Group.prototype.addEntity = function(entity) {
 
-		//Check if the entity is the correct object
-		if(!entity instanceof Entity) {
+	//Check if the entity is the correct object
+	if(!entity instanceof Entity) {
 
-			return;
-
-		}
-
-		//Add the current entity to the list
-		this.entities.push(entity);
-
-	},
-
-	/**
-	 * Function to remove an entity from this group
-	 * @protected
-	 *
-	 * @param {Entity} entity - A reference to entity being removed
-	 */
-	removeEntity: function(entity) {
-
-		//Check if the entity exists, if not, we don't have to delete it
-		var index = this.entities.indexOf(entity);
-
-		//The element doesn't exist in the list
-		if(index === -1) {
-
-			return;
-
-		}
-
-		//Remove the current entity from the group
-		this.entities.splice(index, 1);
-
-	},
-
-	/**
-	 * Function to return all entities with certain components
-	 * @protected
-	 *
-	 * @return {Array} The array with all matching entities
-	 */
-	getEntities: function() {
-
-		//Initialize the array that is going to be returned
-		var entitiesMatch = [];
-
-		//Loop through each entity in this group
-		for(var i = 0; i < this.entities.length; i++) {
-
-			//Initialize an empty array
-			var isThere = [];
-
-			//Loop through the arguments
-			for(var a = 0; a < arguments.length; a++) {
-
-				//If the current entity has the specified component. Push a random
-				//value into the isThere array for later checks
-				if(this.entities[i].components[arguments[a]]) {
-
-					isThere.push(1);
-
-				}
-
-			}
-
-			//If there are as many matches as supplied arguments, every component
-			//is available within this entity
-			if(isThere.length === arguments.length) {
-
-				//Push the current entity into the array that is returned
-				entitiesMatch.push(this.entities[i]);
-
-			}
-
-		}
-
-		//Return all matching entities
-		return entitiesMatch;
+		return;
 
 	}
+
+	//Add the sprite component to the DisplayObjectContainer
+	this.addChild(entity.sprite);
+
+	//If the entity has a position, position the sprite at that position
+	if(entity.hasComponent('position')) {
+
+		//Get the position component
+		var positionComponent = entity.getComponent('position');
+
+		//Translate to a new position
+		var newPosition = {
+			x: positionComponent.position.x * 16,
+			y: positionComponent.position.y * 16
+		};
+
+		//Set the position
+		entity.sprite.position = new PIXI.Point(newPosition.x, newPosition.y);
+
+	}
+
+	//Add the current entity to the list
+	this.entities.push(entity);
+
+};
+
+/**
+ * Function to remove an entity from this group
+ * @protected
+ *
+ * @param {Entity} entity - A reference to entity being removed
+ */
+Group.prototype.removeEntity = function(entity) {
+
+	//Check if the entity exists, if not, we don't have to delete it
+	var index = this.entities.indexOf(entity);
+
+	//The element doesn't exist in the list
+	if(index === -1) {
+
+		return;
+
+	}
+
+	//Remove the sprite component from the the DisplayObjectContainer
+	this.removeChild(entity.sprite);
+
+	//Remove the current entity from the group
+	this.entities.splice(index, 1);
+
+};
+
+/**
+ * Function to return all entities with certain components
+ * @protected
+ *
+ * @return {Array} The array with all matching entities
+ */
+Group.prototype.getEntities = function() {
+
+	//Initialize the array that is going to be returned
+	var entitiesMatch = [];
+
+	//Loop through each entity in this group
+	for(var i = 0; i < this.entities.length; i++) {
+
+		//Initialize an empty array
+		var isThere = [];
+
+		//Loop through the arguments
+		for(var a = 0; a < arguments.length; a++) {
+
+			//If the current entity has the specified component. Push a random
+			//value into the isThere array for later checks
+			if(this.entities[i].components[arguments[a]]) {
+
+				isThere.push(1);
+
+			}
+
+		}
+
+		//If there are as many matches as supplied arguments, every component
+		//is available within this entity
+		if(isThere.length === arguments.length) {
+
+			//Push the current entity into the array that is returned
+			entitiesMatch.push(this.entities[i]);
+
+		}
+
+	}
+
+	//Return all matching entities
+	return entitiesMatch;
 
 };
 
@@ -2640,7 +2423,7 @@ Combat.prototype = {
 			}
 
 			//Add the text log message to the textlog
-			this.game.textLog.addMessage(textLogMessage);
+			this.game.UI.textLog.addMessage(textLogMessage);
 
 		}
 
@@ -2698,10 +2481,16 @@ var Vector2 = require('../../geometry/vector2.js');
  *
  * @class LightMap
  * @classdesc The lightmap system recalculates the lightmap and makes sure that explored areas are visible
+ * Inherits from PIXI.SpriteBatch
  *
  * @param {Game} game - Reference to the currently running game
  */
 var LightMap = function(game) {
+
+	/**
+	 * Inherit the constructor from the PIXI.SpriteBatch object
+	 */
+	PIXI.SpriteBatch.call(this);
 
 	/**
 	 * @property {Game} game - Reference to the current game object
@@ -2719,6 +2508,11 @@ var LightMap = function(game) {
 	this.tiles = [];
 
 	/**
+	 * @property {Array} pixitiles - An array that holds all lightmap objects
+	 */
+	this.pixitiles = [];
+
+	/**
 	 * @property {Array} mult - Multipliers for transforming coordinates into other octants
 	 */
 	this.mult = [
@@ -2733,217 +2527,273 @@ var LightMap = function(game) {
 	 */
 	this.tilesLit = false;
 
+	//Initialize itself
+	this.initialize();
+
 };
 
-LightMap.prototype = {
+//Inherit the prototype from the PIXI.SpriteBatch
+LightMap.prototype = Object.create(PIXI.SpriteBatch.prototype);
+LightMap.prototype.constructor = LightMap;
 
-	/**
-	 * Function that gets called when the game continues one tick
-	 * @protected
-	 */
-	update: function() {
+/**
+ * Initialize the layout of the lightmap
+ * @protected
+ */
+LightMap.prototype.initialize = function() {
 
-		if(this.game.isActive) {
+	//Loop through every horizontal row
+	for(var x = 0; x < this.game.map.settings.tilesX; x++) {
 
-			//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
-			var entities = this.game.map.entities.getEntities("lightSource", "position");
+		this.pixitiles[x] = [];
 
-			//Loop through all matching entities
-			for(var i = 0; i < entities.length; i++) {
+		//Loop through every vertical row
+		for(var y = 0; y < this.game.map.settings.tilesY; y++) {
 
-				//Perform the needed operations for this specific system on one entity
-				this.handleSingleEntity(entities[i]);
+			this.pixitiles[x][y] = PIXI.Sprite.fromFrame("void.png");
+
+			this.pixitiles[x][y].position.x = x * this.game.map.settings.tileSize;
+			this.pixitiles[x][y].position.y = y * this.game.map.settings.tileSize;
+
+			//Add the tile to the container
+			this.addChild(this.pixitiles[x][y]);
+
+		}
+
+	}
+
+	this.game.world.addChild(this);
+
+};
+
+/**
+ * Function that gets called when the game continues one tick
+ * @protected
+ */
+LightMap.prototype.update = function() {
+
+	if(this.game.isActive) {
+
+		//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
+		var entities = this.game.map.entities.getEntities("lightSource", "position");
+
+		//Loop through all matching entities
+		for(var i = 0; i < entities.length; i++) {
+
+			//Perform the needed operations for this specific system on one entity
+			this.handleSingleEntity(entities[i]);
+
+		}
+
+		this.tilesLit = true;
+
+	}else if(this.tilesLit) {
+
+		this.clear();
+		this.tilesLit = false;
+
+	}
+
+};
+
+/**
+ * Performs the needed operations for this specific system on one entity
+ * @protected
+ *
+ * @param {Entity} entity - The entity that is being processed by this system
+ */
+LightMap.prototype.handleSingleEntity = function(entity) {
+
+	//Get the keyboardControl component
+	var lightSourceComponent = entity.getComponent("lightSource");
+	var positionComponent = entity.getComponent("position");
+
+	//Update the lightsource
+	var newLight = this.clear().concat(this.calculate(lightSourceComponent, positionComponent.position));
+
+	//Update the tiles on the map with the new light levels
+	for(var l = 0; l < newLight.length; l++) {
+
+		//If the tile hasn't been explored before
+		if(!this.game.map.tiles[newLight[l].x][newLight[l].y].explored) {
+
+			//Change the alpha of the lightmap tile to match the light level
+			this.pixitiles[newLight[l].x][newLight[l].y].alpha = 1 - newLight[l].lightLevel;
+
+			//Set the tile explored to true
+			this.game.map.tiles[newLight[l].x][newLight[l].y].explored = true;
+
+		}else{
+
+			//If the light level is below 0.7 change it according to the light level
+			if(1 - newLight[l].lightLevel < 0.7) {
+
+				this.pixitiles[newLight[l].x][newLight[l].y].alpha = 1 - newLight[l].lightLevel;
+				this.game.map.tiles[newLight[l].x][newLight[l].y].lightLevel = newLight[l].lightLevel;
+
+			}else{
+
+				this.pixitiles[newLight[l].x][newLight[l].y].alpha = 0.7;
+				this.game.map.tiles[newLight[l].x][newLight[l].y].lightLevel = 0.7;
 
 			}
 
-			this.tilesLit = true;
-
-		}else if(this.tilesLit) {
-
-			this.clear();
-			this.tilesLit = false;
-
 		}
 
-	},
+	}
 
-	/**
-	 * Performs the needed operations for this specific system on one entity
-	 * @protected
-	 *
-	 * @param {Entity} entity - The entity that is being processed by this system
-	 */
-	handleSingleEntity: function(entity) {
+};
 
-		//Get the keyboardControl component
-		var lightSourceComponent = entity.getComponent("lightSource");
-		var positionComponent = entity.getComponent("position");
+/**
+ * Function that checks if a tile blocks light or not
+ * @protected
+ *
+ * @param {Number} x - The X position of the tile
+ * @param {Number} y - The Y position of the tile
+ *
+ * @return {Boolean} True when the tile does block light, false when the tile doesn't block light
+ */
+LightMap.prototype.doesTileBlock = function(x, y) {
 
-		//Update the lightsource
-		var newLight = this.clear().concat(this.calculate(lightSourceComponent, positionComponent.position));
+	return this.game.map.tiles[x][y].blockLight;
 
-		//Update the tiles on the map with the new light levels
-		for(var l = 0; l < newLight.length; l++) {
+};
 
-			this.game.map.tiles[newLight[l].x][newLight[l].y].lightLevel = newLight[l].lightLevel;
-			this.game.map.tiles[newLight[l].x][newLight[l].y].explored = true;
+/**
+ * Function to calculate a new octant
+ * @protected
+ */
+LightMap.prototype.calculateOctant = function(position, row, start, end, lightsource, xx, xy, yx, yy, id) {
 
-		}
+	this.tiles.push({
+		x: position.x,
+		y: position.y,
+		lightLevel: 0
+	});
 
-	},
+	var newStart = 0;
 
-	/**
-	 * Function that checks if a tile blocks light or not
-	 * @protected
-	 *
-	 * @param {Number} x - The X position of the tile
-	 * @param {Number} y - The Y position of the tile
-	 *
-	 * @return {Boolean} True when the tile does block light, false when the tile doesn't block light
-	 */
-	doesTileBlock: function(x, y) {
+	if(start < end) {
+		return;
+	}
 
-		return this.game.map.tiles[x][y].blockLight;
+	var radiusSquared = lightsource.radius * lightsource.radius;
 
-	},
+	for(var i = row; i < lightsource.radius + 1; i++) {
+		var dx = -i - 1;
+		var dy = -i;
 
-	/**
-	 * Function to calculate a new octant
-	 * @protected
-	 */
-	calculateOctant: function(position, row, start, end, lightsource, xx, xy, yx, yy, id) {
+		var blocked = false;
 
-		this.tiles.push({
-			x: position.x,
-			y: position.y,
-			lightLevel: 0
-		});
+		while(dx <= 0) {
 
-		var newStart = 0;
+			dx += 1;
 
-		if(start < end) {
-			return;
-		}
+			var X = position.x + dx * xx + dy * xy;
+			var Y = position.y + dx * yx + dy * yy;
 
-		var radiusSquared = lightsource.radius * lightsource.radius;
+			if(X < this.mapSize.x && X >= 0 && Y < this.mapSize.y && Y >= 0) {
 
-		for(var i = row; i < lightsource.radius + 1; i++) {
-			var dx = -i - 1;
-			var dy = -i;
+				var lSlope = (dx - 0.5) / (dy + 0.5);
+				var rSlope = (dx + 0.5) / (dy - 0.5);
 
-			var blocked = false;
+				if(start < rSlope) {
+					continue;
+				}else if(end > lSlope) {
+					break;
+				}else{
+					if(dx * dx + dy * dy < radiusSquared) {
+						var pos1 = new Vector2(X, Y);
+						var pos2 = position;
+						var d = (pos1.x - pos2.x) * (pos1.x - pos2.x) + (pos1.y - pos2.y) * (pos1.y - pos2.y);
 
-			while(dx <= 0) {
+						this.tiles.push({
+							x: X,
+							y: Y,
+							lightLevel: (lightsource.gradient === false) ? 1 : (1 - (d / (lightsource.radius * lightsource.radius)))
+						});
+					}
 
-				dx += 1;
-
-				var X = position.x + dx * xx + dy * xy;
-				var Y = position.y + dx * yx + dy * yy;
-
-				if(X < this.mapSize.x && X >= 0 && Y < this.mapSize.y && Y >= 0) {
-
-					var lSlope = (dx - 0.5) / (dy + 0.5);
-					var rSlope = (dx + 0.5) / (dy - 0.5);
-
-					if(start < rSlope) {
-						continue;
-					}else if(end > lSlope) {
-						break;
-					}else{
-						if(dx * dx + dy * dy < radiusSquared) {
-							var pos1 = new Vector2(X, Y);
-							var pos2 = position;
-							var d = (pos1.x - pos2.x) * (pos1.x - pos2.x) + (pos1.y - pos2.y) * (pos1.y - pos2.y);
-
-							this.tiles.push({
-								x: X,
-								y: Y,
-								lightLevel: (lightsource.gradient === false) ? 1 : (1 - (d / (lightsource.radius * lightsource.radius)))
-							});
-						}
-
-						if(blocked) {
-							if(this.doesTileBlock(X, Y)) {
-								newStart = rSlope;
-								continue;
-							}else{
-								blocked = false;
-								start = newStart;
-							}
+					if(blocked) {
+						if(this.doesTileBlock(X, Y)) {
+							newStart = rSlope;
+							continue;
 						}else{
-							if(this.doesTileBlock(X, Y) && i < lightsource.radius) {
-								blocked = true;
-								this.calculateOctant(position, i + 1, start, lSlope, lightsource, xx, xy, yx, yy, id + 1);
+							blocked = false;
+							start = newStart;
+						}
+					}else{
+						if(this.doesTileBlock(X, Y) && i < lightsource.radius) {
+							blocked = true;
+							this.calculateOctant(position, i + 1, start, lSlope, lightsource, xx, xy, yx, yy, id + 1);
 
-								newStart = rSlope;
-							}
+							newStart = rSlope;
 						}
 					}
 				}
 			}
-
-			if(blocked) {
-				break;
-			}
-
 		}
 
-	},
-
-	/**
-	 * Sets flag lit to false on all tiles within radius of position specified
-	 * @protected
-	 *
-	 * @return {Array} An empty array
-	 */
-	clear: function() {
-
-		var i = this.tiles.length;
-		while(i--) {
-			this.tiles[i].lightLevel = 0;
+		if(blocked) {
+			break;
 		}
 
-		var o = this.tiles;
-		this.tiles = [];
-		return o;
-
-	},
-
-	/**
-	 * Calculate the new lightning from this lightsource
-	 * @protected
-	 *
-	 * @param {LightSource} lightSource - The lightsource that is being calculated
-	 * @param {Position} position - The position of the lightsource
-	 *
-	 * @return {Array} An array containing all tiles
-	 */
-	calculate: function(lightSource, position) {
-
-		for(var i = 0; i < 8; i++) {
-
-			this.calculateOctant(position, 1, 1.0, 0.0, lightSource,
-				this.mult[0][i], this.mult[1][i], this.mult[2][i], this.mult[3][i], 0);
-
-		}
-
-		//Push this tile and it's light level's in the tiles array
-		this.tiles.push({
-			x: position.x,
-			y: position.y,
-			lightLevel: 1
-		});
-
-		//Return the tiles
-		return this.tiles;
 	}
 
+};
+
+/**
+ * Sets flag lit to false on all tiles within radius of position specified
+ * @protected
+ *
+ * @return {Array} An empty array
+ */
+LightMap.prototype.clear = function() {
+
+	var i = this.tiles.length;
+	while(i--) {
+		this.tiles[i].lightLevel = 0;
+	}
+
+	var o = this.tiles;
+	this.tiles = [];
+	return o;
+
+};
+
+/**
+ * Calculate the new lightning from this lightsource
+ * @protected
+ *
+ * @param {LightSource} lightSource - The lightsource that is being calculated
+ * @param {Position} position - The position of the lightsource
+ *
+ * @return {Array} An array containing all tiles
+ */
+LightMap.prototype.calculate = function(lightSource, position) {
+
+	for(var i = 0; i < 8; i++) {
+
+		this.calculateOctant(position, 1, 1.0, 0.0, lightSource,
+			this.mult[0][i], this.mult[1][i], this.mult[2][i], this.mult[3][i], 0);
+
+	}
+
+	//Push this tile and it's light level's in the tiles array
+	this.tiles.push({
+		x: position.x,
+		y: position.y,
+		lightLevel: 1
+	});
+
+	//Return the tiles
+	return this.tiles;
 };
 
 //Export the Browserify module
 module.exports = LightMap;
 
-},{"../../geometry/vector2.js":32}],27:[function(require,module,exports){
+},{"../../geometry/vector2.js":31}],27:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -2976,11 +2826,7 @@ Movement.prototype = {
 	handleSingleEntity: function(entity, newPosition) {
 
 		//Check if the sprite needs to be flipped
-		if(entity.hasComponent("sprite")) {
-
-			this.changeDirection(entity, newPosition);
-
-		}
+		this.changeDirection(entity, newPosition);
 
 		//Check if the new position is correct
 		if(this.canMove(entity, newPosition)) {
@@ -2998,7 +2844,10 @@ Movement.prototype = {
 			//And add him to the next tile that he is going to be on
 			nextTile.addEntity(entity);
 
-			//Pop the new position from the "stack"
+			//Update the position of the sprite
+			entity.sprite.position = new PIXI.Point(newPosition.x * this.game.map.settings.tileSize, newPosition.y * this.game.map.settings.tileSize);
+
+			//Set the new position in the position component
 			positionComponent.position = newPosition;
 
 		}
@@ -3017,20 +2866,23 @@ Movement.prototype = {
 
 		//Get components
 		var positionComponent = entity.getComponent("position");
-		var spriteComponent = entity.getComponent("sprite");
 
 		//Check if the entity moved left or right
 		if(newPosition.x > positionComponent.position.x) {
 
-			//The entity moved right
-			spriteComponent.direction = "right";
+			entity.textureName = entity.textureName.replace("left", "right");
 
 		}else if(newPosition.x < positionComponent.position.x) {
 
-			//The entity moved left
-			spriteComponent.direction = "left";
+			entity.textureName = entity.textureName.replace("right", "left");
 
 		}
+
+		//Get the texture
+		var texture = PIXI.Texture.fromFrame(entity.textureName);
+
+		//The entity moved right
+		entity.sprite.setTexture(texture);
 
 	},
 
@@ -3157,7 +3009,6 @@ Open.prototype = {
 
 		//Get the components from the current entity and store them temporarily in a variable
 		var canOpenComponent = entity.getComponent("canOpen");
-		var spriteComponent = entity.getComponent("sprite");
 		var positionComponent = entity.getComponent("position");
 		var collideComponent = entity.getComponent("collide");
 		var tooltipComponent = entity.getComponent("tooltip");
@@ -3168,13 +3019,21 @@ Open.prototype = {
 			//Change the door's state to open
 			canOpenComponent.state = "open";
 
+			//Change the texture name
+			entity.textureName = entity.textureName.replace("closed", "open");
+
+			//Get the PIXI.Texture object
+			var texture = PIXI.Texture.fromFrame(entity.textureName);
+
 			//Change the sprite to open
-			spriteComponent.tile += 1;
+			entity.sprite.setTexture(texture);
 
 			//Make sure the collide component doesn't say it collides anymore
 			collideComponent.collide = false;
 
-			tooltipComponent.type = ["Open"];
+			//Change the tooltip component type text
+			//TODO: Make this work again
+			//tooltipComponent.type = ["Open"];
 
 			//Make sure the tile that this openable entity is on doesn't block light anymore
 			this.game.map.tiles[positionComponent.position.x][positionComponent.position.y].blockLight = false;
@@ -3336,456 +3195,7 @@ module.exports = PathFinding;
 
 
 
-},{"../../geometry/vector2.js":32,"../../libraries/easystar.js":37}],30:[function(require,module,exports){
-//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
-'use strict';
-
-//Require necessary modules
-var Vector2 = require('../../geometry/vector2.js');
-
-/**
- * Render System constructor
- *
- * @class Render
- * @classdesc The renderer draws entities onto the screen
- *
- * @param {Game} game - Reference to the currently running game
- */
-var Render = function(game) {
-
-	/**
-	 * @property {Game} game - Reference to the current game object
-	 */
-	this.game = game;
-
-	/**
-	 * @property {Object} canvas - Reference to the canvas object everything is drawn on
-	 */
-	this.canvas = null;
-
-	/**
-	 * @property {Object} context - The 2D context of the current canvas object
-	 */
-	this.context = null;
-
-	//Initialize itself
-	this.initialize();
-
-};
-
-Render.prototype = {
-
-	/**
-	 * The 'constructor' for this component
-	 * Gets that canvas object and it's 2D context
-	 * @protected
-	 */
-	initialize: function() {
-
-		//Get the canvas object from the games settings
-		this.canvas = this.game.settings.canvas;
-
-		//Define the context to draw on
-		this.context = this.game.settings.canvas.getContext("2d");
-
-		//Disable image smoothing with some very ugly browser specific code
-		//TODO: Check again in 10 years if there are better solutions to this
-		this.context.mozImageSmoothingEnabled = false;
-		this.context.webkitImageSmoothingEnabled = false;
-		this.context.msImageSmoothingEnabled = false;
-		this.context.imageSmoothingEnabled = false;
-
-	},
-
-	/**
-	 * Function that gets called when the game continues one tick
-	 * @protected
-	 */
-	update: function() {
-
-		//Update the camera
-		//TODO: Move this outta here!
-		this.game.camera.update();
-
-		//Clear the canvas and draw the map
-		this.clear();
-		this.drawMap();
-
-		//Then loop through all keyboardControl Entities and check the user input, and handle accordingly
-		var entities = this.game.map.entities.getEntities("position", "sprite");
-
-		//Save the context to push a copy of our current drawing state onto our drawing state stack
-		this.context.save();
-
-		//Loop through all matching entities
-		for(var i = 0; i < entities.length; i++) {
-
-			//Perform the needed operations for this specific system on one entity
-			this.handleSingleEntity(entities[i]);
-
-		}
-
-		//Pop the last saved drawing state off of the drawing state stack
-		this.context.restore();
-
-		//Draw the lightmap
-		this.drawLightMap();
-
-		//Draw the UI
-		this.drawMousePointer();
-		this.drawUI();
-
-	},
-
-	/**
-	 * Performs the needed operations for this specific system on one entity
-	 * @protected
-	 *
-	 * @param {Entity} entity - The entity that is being processed by this system
-	 */
-	handleSingleEntity: function(entity) {
-
-		//Define variables
-		var map = this.game.map;
-		var camera = this.game.camera;
-
-		//Get the components from the current entity and store them temporarily in a variable
-		var spriteComponent = entity.getComponent("sprite");
-		var positionComponent = entity.getComponent("position");
-
-		//TODO: Use a preloader and only get the file once, not every frame T__T
-		var img = document.getElementById(spriteComponent.sprite);
-
-		//Draw the sprite of this entity on the canvas
-		this.context.drawImage(
-			img,
-			spriteComponent.getTileNumber() * 16,
-			spriteComponent.row * 16,
-			16,
-			16,
-			(positionComponent.position.x * map.settings.tileSize) - camera.position.x + spriteComponent.offset.x,
-			(positionComponent.position.y * map.settings.tileSize) - camera.position.y + spriteComponent.offset.y,
-			map.settings.tileSize,
-			map.settings.tileSize
-		);
-
-		//If the entity has health, draw a healthbar
-		if(entity.hasComponent("health")) {
-
-			//Get the components
-			var healthComponent = entity.getComponent("health");
-
-			if(healthComponent.isDamaged()) {
-
-				this.context.fillStyle = "red";
-
-				//Create the object ( just a rectangle for now )!
-				this.context.fillRect(
-					(positionComponent.position.x * map.settings.tileSize) - camera.position.x,
-					(positionComponent.position.y * map.settings.tileSize) - camera.position.y,
-					map.settings.tileSize * healthComponent.percentage(),
-					5
-				);
-
-
-			}
-
-		}
-	},
-
-	/**
-	 * Draw the current map onto the canvas
-	 * @protected
-	 */
-	drawMap: function() {
-
-		//Define variables
-		var map = this.game.map;
-		var camera = this.game.camera;
-
-		//TODO: Use a preloader and only get the file once, not every frame
-		var tileSet = document.getElementById("tileset");
-
-		//Save the context to push a copy of our current drawing state onto our drawing state stack
-		this.context.save();
-
-		//Loop through every horizontal row
-		//TODO: Only draw tiles that are visible within the camera
-		for(var x = 0; x < map.settings.tilesX; x++) {
-
-			//Loop through every vertical row
-			for(var y = 0; y < map.settings.tilesY; y++) {
-
-				//Get the type of the current tile
-				var tileRow = map.tiles[x][y].tileRow;
-				var tileNumber = map.tiles[x][y].tileNumber;
-
-				this.context.drawImage(
-					tileSet,
-					tileNumber * 16,
-					tileRow * 16,
-					16,
-					16,
-					(x * map.settings.tileSize) - Math.round(camera.position.x),
-					(y * map.settings.tileSize) - Math.round(camera.position.y),
-					map.settings.tileSize,
-					map.settings.tileSize
-				);
-
-			}
-
-		}
-
-		//Pop the last saved drawing state off of the drawing state stack
-		this.context.restore();
-
-	},
-
-	/**
-	 * Draw the current lightmap onto the canvas
-	 * @protected
-	 */
-	drawLightMap: function() {
-
-		//Define variables
-		var map = this.game.map;
-		var camera = this.game.camera;
-
-		//Save the context to push a copy of our current drawing state onto our drawing state stack
-		this.context.save();
-
-		//Loop through every horizontal row
-		for(var x = 0; x < map.settings.tilesX; x++) {
-
-			//Loop through every vertical row
-			for(var y = 0; y < map.settings.tilesY; y++) {
-
-				//Calculate the render lightLevel based on the current lighlevel of a tile
-				if(map.tiles[x][y].renderLightLevel < map.tiles[x][y].lightLevel){
-
-					if((map.tiles[x][y].renderLightLevel + 0.02) > map.tiles[x][y].lightLevel){
-
-						map.tiles[x][y].renderLightLevel = map.tiles[x][y].lightLevel;
-
-					}else{
-
-						map.tiles[x][y].renderLightLevel += 0.02;
-
-					}
-
-				}else if(map.tiles[x][y].renderLightLevel > map.tiles[x][y].lightLevel && map.tiles[x][y].renderLightLevel > 0.3){
-
-					if((map.tiles[x][y].renderLightLevel - 0.001) < 0.3){
-
-						map.tiles[x][y].renderLightLevel = 0.3;
-
-					}else{
-
-						map.tiles[x][y].renderLightLevel -= 0.001;
-
-					}
-
-				}
-
-				//Draw the lightmap
-				this.context.fillStyle = "rgba(0, 0, 0, " + (1 - map.tiles[x][y].renderLightLevel) + ")";
-
-				//Create a rectangle!
-				this.context.fillRect(
-					//Get the current position of the tile, and check where it is in the camera's viewport
-					(x * map.settings.tileSize) - Math.round(camera.position.x),
-					(y * map.settings.tileSize) - Math.round(camera.position.y),
-					map.settings.tileSize,
-					map.settings.tileSize
-				);
-
-			}
-
-		}
-
-		//Pop the last saved drawing state off of the drawing state stack
-		this.context.restore();
-
-	},
-
-	/**
-	 * Draw the UI on top of everything
-	 * @protected
-	 */
-	drawMousePointer: function() {
-
-		//Define variables
-		var map = this.game.map;
-		var camera = this.game.camera;
-		this.mousePos = this.game.interactionmanager.mousePos;
-
-		//TODO: Use a preloader and only get the file once, not every frame
-		var img = document.getElementById("ui");
-
-		//Calculate the offset of the camera, how many pixels are left at the left and top of the screen
-		var cameraXOffset = camera.position.x % map.settings.tileSize;
-		var cameraYOffset = camera.position.y % map.settings.tileSize;
-
-		//Calculate at which tile the mouse is currently pointing relative to the camera
-		var tileXRel = Math.floor((this.mousePos.x + cameraXOffset) / map.settings.tileSize);
-		var tileYRel = Math.floor((this.mousePos.y + cameraYOffset) / map.settings.tileSize);
-
-		//Calculate at which tile the mouse is currently pointing absolute to the camera
-		var tileXAbs = Math.floor((this.mousePos.x + camera.position.x) / map.settings.tileSize);
-		var tileYAbs = Math.floor((this.mousePos.y + camera.position.y) / map.settings.tileSize);
-
-		//Create a new Vector2 object of the tile's position
-		var tilePosition = new Vector2(tileXAbs, tileYAbs);
-
-		//If the tile that the mouse is pointing at is not within the map, quit here
-		if(!map.insideBounds(tilePosition)) {
-			return;
-		}
-
-		//Get the tile at the mouse position
-		var tile = map.getTileAt(tilePosition);
-
-		//If the tile isn't a floor tile, you can't walk there so why bother showing the mouse pointer
-		//Also don't show the mouse pointer if you haven't explored the tile yet
-		if(tile.type !== 2 || !tile.explored) {
-			return;
-		}
-
-		//TODO: Clean up the entire next section, code is very large and could be done a lot better
-
-		//Draw the sprite of the mouse pointer on the canvas
-		this.context.drawImage(
-			img,
-			0,
-			0,
-			16,
-			16,
-			tileXRel * map.settings.tileSize - cameraXOffset,
-			tileYRel * map.settings.tileSize - cameraYOffset,
-			map.settings.tileSize,
-			map.settings.tileSize
-		);
-
-		//Check if there are entities at the tile
-		if(tile.entities.length === 0) {
-			return;
-		}
-
-		//Get the lats entity
-		var lastEntity = tile.entities[tile.entities.length - 1];
-
-		if(lastEntity.hasComponent("tooltip")) {
-
-			//Get the components
-			var tooltipComponent = lastEntity.getComponent("tooltip");
-
-			//Determine what the lineHeight is
-			var lineHeight = (tooltipComponent.fontSize + 5);
-
-			//Draw a rectangle underneath the text
-			this.context.fillStyle = "rgba(0, 0, 0, 0.7)";
-
-			//Create a rectangle!
-			this.context.fillRect(
-				//Get the current position of the tile, and check where it is in the camera's viewport
-				this.mousePos.x + 5,
-				this.mousePos.y + 10,
-				tooltipComponent.maxWidth + 20,
-				lineHeight * (tooltipComponent.title.length + tooltipComponent.type.length + tooltipComponent.description.length) + 20
-			);
-
-			//Start by drawing on line number 0, this value will get incremented every new line
-			var currentPos = 0;
-
-			//Draw the tooltips title
-			for(var t = 0; t < tooltipComponent.title.length; t++) {
-
-				this.context.font = "bold " + tooltipComponent.fontSize + "px " + tooltipComponent.font;
-				this.context.fillStyle = "rgba(255, 255, 255, 1)";
-
-				//Draw the title on screen
-				this.context.fillText(
-					tooltipComponent.title[t],
-					this.mousePos.x + 15,
-					this.mousePos.y + 15 + lineHeight + (lineHeight * currentPos)
-				);
-
-				//Continue drawing on the next line
-				currentPos++;
-
-			}
-
-			//Draw the tooltips type
-			for(var y = 0; y < tooltipComponent.type.length; y++) {
-
-				this.context.font = tooltipComponent.fontSize + "px " + tooltipComponent.font;
-				this.context.fillStyle = "rgba(255, 255, 200, 1)";
-
-				//Draw the title on screen
-				this.context.fillText(
-					tooltipComponent.type[y],
-					this.mousePos.x + 15,
-					this.mousePos.y + 15 + lineHeight + (lineHeight * currentPos)
-				);
-
-				//Continue drawing on the next line
-				currentPos++;
-
-			}
-
-			//Draw the tooltips description
-			for(var i = 0; i < tooltipComponent.description.length; i++) {
-
-				//Set the current fontsize to the context of the canvas
-				this.context.font = tooltipComponent.fontSize + "px " + tooltipComponent.font;
-				this.context.fillStyle = "rgba(180, 180, 180, 1)";
-
-				//Draw the description on screen
-				this.context.fillText(
-					tooltipComponent.description[i],
-					this.mousePos.x + 15,
-					this.mousePos.y + 15 + lineHeight + (lineHeight * currentPos)
-				);
-
-				//Continue drawing on the next line
-				currentPos++;
-
-			}
-
-
-		}
-
-	},
-
-	/**
-	 * Starts the drawing of the UI by calling the render function of the global UI container
-	 * @protected
-	 */
-	drawUI: function() {
-
-		//Provide the canvas context and a starting position of 0,0 in the top left
-		this.game.UI.render(this.context, new Vector2(0, 0));
-
-	},
-
-	/**
-	 * Function to clear the canvas
-	 * @protected
-	 */
-	clear: function() {
-
-		//Clear the entire canvas
-		this.context.clearRect(0, 0, this.game.settings.canvas.width, this.game.settings.canvas.height);
-
-	}
-
-};
-
-//Export the Browserify module
-module.exports = Render;
-
-
-},{"../../geometry/vector2.js":32}],31:[function(require,module,exports){
+},{"../../geometry/vector2.js":31,"../../libraries/easystar.js":36}],30:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -3899,7 +3309,7 @@ Boundary.prototype = {
 //Export the Browserify module
 module.exports = Boundary;
 
-},{}],32:[function(require,module,exports){
+},{}],31:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -4020,7 +3430,7 @@ Vector2.prototype = {
 //Export the Browserify module
 module.exports = Vector2;
 
-},{}],33:[function(require,module,exports){
+},{}],32:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -4030,17 +3440,8 @@ var Game = require('./core/game.js');
 //The initialize Module
 var Intialize = function initializeCanvas() {
 
-	//Initialize the canvas
-	var canvas = document.getElementById("canvas");
-
-	//Make the canvas go fullscreen
-	canvas.width = window.innerWidth;
-	canvas.height = window.innerHeight;
-
 	var options = {
-		canvas: canvas, //The canvas object on which our dungeon is placed on
-		cameraBounds: false,
-		debug: false //Boolean to enable or disable the debugger
+		//Empty for now
 	};
 
 	//Create a new game
@@ -4064,7 +3465,7 @@ window.addEventListener("load", Intialize);
 //Export the Browserify module
 module.exports = Intialize;
 
-},{"./core/game.js":2}],34:[function(require,module,exports){
+},{"./core/game.js":2}],33:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -4162,7 +3563,7 @@ Event.prototype = {
 //Export the Browserify module
 module.exports = Event;
 
-},{}],35:[function(require,module,exports){
+},{}],34:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -4278,7 +3679,7 @@ Key.prototype = {
 //Export the Browserify module
 module.exports = Key;
 
-},{"./event.js":34}],36:[function(require,module,exports){
+},{"./event.js":33}],35:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -4396,7 +3797,7 @@ Keyboard.prototype = {
 module.exports = Keyboard;
 
 
-},{"./key.js":35}],37:[function(require,module,exports){
+},{"./key.js":34}],36:[function(require,module,exports){
 //NameSpace
 var EasyStar = EasyStar || {};
 
@@ -4946,7 +4347,7 @@ if(typeof define === "function" && define.amd) {
 //Export the Browserify module
 module.exports = EasyStar;
 
-},{}],38:[function(require,module,exports){
+},{}],37:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -5169,7 +4570,7 @@ MersenneTwister.prototype.genrand_res53 = function() {
 //Export the Browserify module
 module.exports = MersenneTwister;
 
-},{}],39:[function(require,module,exports){
+},{}],38:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -5181,10 +4582,16 @@ var Tile = require('./tile.js');
  *
  * @class Map
  * @classdesc The object that holds all the rooms, corridors and tiles
+ * Inherits from PIXI.SpriteBatch
  *
  * @param {Game} game - Reference to the current game object
  */
 var Map = function(game) {
+
+	/**
+	 * Inherit the constructor from the PIXI.SpriteBatch object
+	 */
+	PIXI.SpriteBatch.call(this);
 
 	/**
 	 * @property {Game} game - Reference to the current game object
@@ -5212,9 +4619,9 @@ var Map = function(game) {
 	this.tiles = [];
 
 	/**
-	 * @property {Array} objects - An array that holds all objects that are on the map
+	 * @property {Array} pixitiles - An array that holds all tile objects
 	 */
-	this.objects = [];
+	this.pixitiles = [];
 
 	/**
 	 * @property {Vector2} entrance - An object that holds the position of the entrance of this map
@@ -5251,166 +4658,178 @@ var Map = function(game) {
 
 };
 
-Map.prototype = {
+//Inherit the prototype from the PIXI.SpriteBatch
+Map.prototype = Object.create(PIXI.SpriteBatch.prototype);
+Map.prototype.constructor = Map;
 
-	/**
-	 * Initialize the layout of the map, filling it with empty tiles
-	 * @protected
-	 */
-	initialize: function() {
+/**
+ * Initialize the layout of the map, filling it with empty tiles
+ * @protected
+ */
+Map.prototype.initialize = function() {
 
-		//TODO: Make this dynamic on the depth of the dungeon, this will allow the generator to make more complicated maps the deeper you go
-		//Define settings
-		this.settings = {
-			tilesX: 60, //The number of horizontal tiles on this map
-			tilesY: 40, //The number of vertical tiles on this map
-			tileSize: 48, //The width and height of a single tile
-			maxRooms: 15, //The maximum number of rooms on this map
-			minRoomWidth: 5, //The minimum width of a single room
-			maxRoomWidth: 8, //The maximum width of a single room
-			minRoomHeight: 5, //The minimum height of a single room
-			maxRoomHeight: 8, //The maximum height of a single room
-			roomSpacing: 1, //The length of a corridor, 0 for no corridors
-			maxMainRooms: 10,
-			maxMediumRooms: 15,
-			maxHardRooms: 5
-		};
+	//TODO: Make this dynamic on the depth of the dungeon, this will allow the generator to make more complicated maps the deeper you go
+	//Define settings
+	this.settings = {
+		tilesX: 60, //The number of horizontal tiles on this map
+		tilesY: 40, //The number of vertical tiles on this map
+		tileSize: 16, //The width and height of a single tile
+		maxRooms: 15, //The maximum number of rooms on this map
+		minRoomWidth: 5, //The minimum width of a single room
+		maxRoomWidth: 8, //The maximum width of a single room
+		minRoomHeight: 5, //The minimum height of a single room
+		maxRoomHeight: 8, //The maximum height of a single room
+		roomSpacing: 1, //The length of a corridor, 0 for no corridors
+		maxMainRooms: 10,
+		maxMediumRooms: 15,
+		maxHardRooms: 5
+	};
 
-		//Loop through every horizontal row
-		for(var x = 0; x < this.settings.tilesX; x++) {
+	//Loop through every horizontal row
+	for(var x = 0; x < this.settings.tilesX; x++) {
 
-			//Initialize this row
-			this.tiles[x] = [];
+		//Initialize this row
+		this.tiles[x] = [];
+		this.pixitiles[x] = [];
 
-			//Loop through every vertical row
-			for(var y = 0; y < this.settings.tilesY; y++) {
-
-				//Initialize this position by setting it to zero, and blocking light
-				this.tiles[x][y] = new Tile(0, true, 0, 0);
-
-			}
-
-		}
-
-	},
-
-	/**
-	 * Function to get a tile at a position
-	 * @protected
-	 *
-	 * @param {Vector2} position - The position that is being requested
-	 *
-	 * @return {Tile} The tile object that has been found, empty object otherwise
-	 */
-	getTileAt: function(position) {
-
-		//Try to get the tile object from the map
-		var tile = this.tiles[position.x][position.y];
-
-		//Check if the tile object is something, else return an empty tile object
-		if(tile) {
-
-			return tile;
-
-		}else{
-
-			return new Tile();
-
-		}
-
-	},
-
-	/**
-	 * Function to check if one position is inside the maps boundary
-	 * @protected
-	 *
-	 * @param {Vector2} position - The position that is being requested
-	 *
-	 * @return {Boolean} Returns true if the position is within this map, returns false if it isn't
-	 */
-	insideBounds: function(position) {
-
-		return(
-			position.x > 0 &&
-				position.x < this.settings.tilesX &&
-				position.y > 0 &&
-				position.y < this.settings.tilesY
-			);
-
-	},
-
-	/**
-	 * Function that returns an array with only the tiletypes of every position
-	 * Used for EasyStar Pathfinding
-	 * @protected
-	 *
-	 * @return {Array} Array with only the tiletypes of every position on the map
-	 */
-	typeList: function() {
-
-		//Define variables
-		var mapTypeList = [];
-
-		//Loop through every horizontal row
+		//Loop through every vertical row
 		for(var y = 0; y < this.settings.tilesY; y++) {
 
-			//Initialize this row
-			mapTypeList.push([]);
+			//Initialize this position by setting it to zero, and blocking light
+			this.tiles[x][y] = new Tile(0, true, 0, 0);
 
-			//Loop through every vertical row
-			for(var x = 0; x < this.settings.tilesX; x++) {
+			this.pixitiles[x][y] = PIXI.Sprite.fromFrame("void.png");
 
-				//Initialize this position by setting it to zero, and blocking light
-				mapTypeList[y][x] = (this.tiles[x][y].type);
+			this.pixitiles[x][y].position.x = x * this.settings.tileSize;
+			this.pixitiles[x][y].position.y = y * this.settings.tileSize;
 
-			}
+			//Add the tile to the container
+			this.addChild(this.pixitiles[x][y]);
 
 		}
 
-		//Return the array with Y X coordinates of every tiletype
-		return mapTypeList;
+	}
 
-	},
+	//Add the container object to the stage
+	this.game.world.addChild(this);
 
-	/**
-	 * Check if a single room overlaps a room that is already on the map and if it's inside the maps boundaries
-	 * @protected
-	 *
-	 * @param {Room} room - The room object that has to be checked
-	 *
-	 * @return {Boolean} True when the room intersects with an existing room, false when it's not intersecting
-	 */
-	roomFits: function(room) {
+};
 
-		//Check if the room fits inside the boundaries of this map. If not we can't place it.
-		if(room.x1 < 1 || room.x2 > this.settings.tilesX - 1 || room.y1 < 1 || room.y2 > this.settings.tilesY - 1) {
+/**
+ * Function to get a tile at a position
+ * @protected
+ *
+ * @param {Vector2} position - The position that is being requested
+ *
+ * @return {Tile} The tile object that has been found, empty object otherwise
+ */
+Map.prototype.getTileAt = function(position) {
+
+	//Try to get the tile object from the map
+	var tile = this.tiles[position.x][position.y];
+
+	//Check if the tile object is something, else return an empty tile object
+	if(tile) {
+
+		return tile;
+
+	}else{
+
+		return new Tile();
+
+	}
+
+};
+
+/**
+ * Function to check if one position is inside the maps boundary
+ * @protected
+ *
+ * @param {Vector2} position - The position that is being requested
+ *
+ * @return {Boolean} Returns true if the position is within this map, returns false if it isn't
+ */
+Map.prototype.insideBounds = function(position) {
+
+	return(
+		position.x > 0 &&
+			position.x < this.settings.tilesX &&
+			position.y > 0 &&
+			position.y < this.settings.tilesY
+		);
+
+};
+
+/**
+ * Function that returns an array with only the tiletypes of every position
+ * Used for EasyStar Pathfinding
+ * @protected
+ *
+ * @return {Array} Array with only the tiletypes of every position on the map
+ */
+Map.prototype.typeList = function() {
+
+	//Define variables
+	var mapTypeList = [];
+
+	//Loop through every horizontal row
+	for(var y = 0; y < this.settings.tilesY; y++) {
+
+		//Initialize this row
+		mapTypeList.push([]);
+
+		//Loop through every vertical row
+		for(var x = 0; x < this.settings.tilesX; x++) {
+
+			//Initialize this position by setting it to zero, and blocking light
+			mapTypeList[y][x] = (this.tiles[x][y].type);
+
+		}
+
+	}
+
+	//Return the array with Y X coordinates of every tiletype
+	return mapTypeList;
+
+};
+
+/**
+ * Check if a single room overlaps a room that is already on the map and if it's inside the maps boundaries
+ * @protected
+ *
+ * @param {Room} room - The room object that has to be checked
+ *
+ * @return {Boolean} True when the room intersects with an existing room, false when it's not intersecting
+ */
+Map.prototype.roomFits = function(room) {
+
+	//Check if the room fits inside the boundaries of this map. If not we can't place it.
+	if(room.x1 < 1 || room.x2 > this.settings.tilesX - 1 || room.y1 < 1 || room.y2 > this.settings.tilesY - 1) {
+
+		return false;
+
+	}
+
+	//Loop through every room in the list
+	for(var i = 0; i < this.allRooms.length; i++) {
+
+		//Check if the room intersects with the current room
+		if(room.x1 <= this.allRooms[i].x2 && room.x2 >= this.allRooms[i].x1 && room.y1 <= this.allRooms[i].y2 && room.y2 >= this.allRooms[i].y1) {
 
 			return false;
 
 		}
 
-		//Loop through every room in the list
-		for(var i = 0; i < this.allRooms.length; i++) {
-
-			//Check if the room intersects with the current room
-			if(room.x1 <= this.allRooms[i].x2 && room.x2 >= this.allRooms[i].x1 && room.y1 <= this.allRooms[i].y2 && room.y2 >= this.allRooms[i].y1) {
-
-				return false;
-
-			}
-
-		}
-		//If the room doesn't intersect another room, return true
-		return true;
-
 	}
+	//If the room doesn't intersect another room, return true
+	return true;
 
 };
 
 //Export the Browserify module
 module.exports = Map;
 
-},{"./tile.js":43}],40:[function(require,module,exports){
+},{"./tile.js":42}],39:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -5455,25 +4874,30 @@ MapDecorator.prototype = {
 	initialize: function() {
 
 		//Filling the tileArray used by the auto tiling in the setTileNumbers function, a more detailed explanation can be found there
-		this.tileArray[0] = [255];
-		this.tileArray[1] = [238, 239, 254];
-		this.tileArray[2] = [125, 204, 253];
-		this.tileArray[3] = [76, 92, 220];
-		this.tileArray[4] = [123, 187, 251];
-		this.tileArray[5] = [122, 152, 186, 192, 200, 216, 218, 234, 250];
-		this.tileArray[6] = [25, 89, 57, 121];
-		this.tileArray[7] = [24, 72, 80, 88];
-		this.tileArray[8] = [134, 166, 230, 231, 247];
-		this.tileArray[9] = [32];
-		this.tileArray[10] = [17, 33, 49, 196];
-		this.tileArray[11] = [16];
-		this.tileArray[12] = [35, 51, 163, 179];
-		this.tileArray[13] = [34, 162, 130];
-		this.tileArray[14] = [64];
-		this.tileArray[15] = [128];
-		this.tileArray[16] = [120];
-		this.tileArray[17] = [178];
-		this.tileArray[18] = [194, 226];
+		this.tileArray["wall_single"] = [206];
+		this.tileArray["wall_single_alone"] = [124, 182, 214, 222, 238, 239, 246, 252, 254, 255];
+		this.tileArray["wall_pillar_left"] = [125, 204, 212, 253];
+		this.tileArray["wall_corner_left"] = [76, 92, 148, 156, 220, 221];
+		this.tileArray["wall_top_end"] = [123, 187, 217, 243, 249, 251];
+		this.tileArray["wall_top_continue"] = [58, 106, 122, 154, 186, 200, 202, 218, 234, 250];
+		this.tileArray["wall_corner_left_down"] = [25, 89, 57, 97, 105, 113, 121];
+		this.tileArray["wall_left_continue"] = [24, 72, 88];
+		this.tileArray["wall_corner_right"] = [100, 102, 134, 166, 183, 198, 228, 230, 231, 247];
+		this.tileArray["wall_corner_both"] = [192];
+		this.tileArray["pillar_right"] = [32];
+		this.tileArray["pillar_left"] = [16];
+		this.tileArray["pillar_both"] = [48];
+		this.tileArray["wall"] = [17, 33, 49, 68, 85, 101, 117, 132, 149, 161, 165, 181, 196, 213, 229, 245];
+		this.tileArray["wall_corner_right_down"] = [35, 51, 145, 147, 163, 177, 179];
+		this.tileArray["wall_right_continue"] = [34, 162, 130];
+		this.tileArray["wall_continue_left_corner"] = [64, 80];
+		this.tileArray["wall_continue_right_corner"] = [128, 160];
+		this.tileArray["wall_corner_left_down_corner_right"] = [96];
+		this.tileArray["wall_continue_left_corner_right_right"] = [152, 216];
+		this.tileArray["wall_corner_right_corner_left_up"] = [144];
+		this.tileArray["wall_continue_left_corner_right"] = [104, 120];
+		this.tileArray["wall_continue_right_corner_left"] = [50, 146, 178];
+		this.tileArray["wall_corner_right_corner_left"] = [98, 194, 226];
 
 	},
 
@@ -5505,7 +4929,7 @@ MapDecorator.prototype = {
 	 * The values represent the results that can come out of the bitwise calculation of surrounding tiles
 	 * Calculating these values is rather easy following this graph:
 	 *
-	 * 16 - 2 - 32
+	 * 16 - 1 - 32
 	 *  8 - x - 2
 	 * 64 - 4 - 128
 	 *
@@ -5581,12 +5005,30 @@ MapDecorator.prototype = {
 							//Chose a random row, 0 or 1. This is to add a little more variety in the tiles
 							map.tiles[x][y].tileRow = Utils.randomNumber(0, 1);
 
+							var rand = Utils.randomNumber(1, 2);
+
+							var textureName = index + "_" + rand + ".png";
+
+							var texture = PIXI.Texture.fromFrame(textureName);
+
+							map.pixitiles[x][y].setTexture(texture);
+
 							//Break the loop because we have found what we are looking for
 							break;
 
 						}
 
 					}
+
+				}else if(map.tiles[x][y].type === 2) {
+
+					var random = Utils.randomNumber(1, 4);
+
+					var texturename = "floor_" + random + ".png";
+
+					var text = PIXI.Texture.fromFrame(texturename);
+
+					this.game.map.pixitiles[x][y].setTexture(text);
 
 				}
 
@@ -5712,7 +5154,16 @@ MapDecorator.prototype = {
 		var doorEntity = PropFactory.newDoor(this.game, position);
 
 		if(orientation === true) {
-			doorEntity.components.sprite.tile = 0;
+
+			//Also change the name of the texture so the Open system can easily change the sprite
+			doorEntity.textureName = "door_vertical_closed.png";
+
+			//Get the PIXI.Texture object
+			var texture = PIXI.Texture.fromFrame('door_vertical_closed.png');
+
+			//Change the sprite to open
+			doorEntity.sprite.setTexture(texture);
+
 		}
 
 		//Add the entity to the map
@@ -5822,7 +5273,7 @@ MapDecorator.prototype = {
 //Export the Browserify module
 module.exports = MapDecorator;
 
-},{"../core/utils.js":4,"../factories/decorationfactory.js":5,"../factories/enemyfactory.js":6,"../factories/propfactory.js":8,"../geometry/vector2.js":32}],41:[function(require,module,exports){
+},{"../core/utils.js":3,"../factories/decorationfactory.js":5,"../factories/enemyfactory.js":6,"../factories/propfactory.js":8,"../geometry/vector2.js":31}],40:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -6210,6 +5661,8 @@ MapFactory.prototype = {
 
 		this.game.map.allRooms.push(room);
 
+		//var texture = PIXI.Texture.fromImage("assets/tilesets/tile.png");
+
 		//Loop through every horizontal row
 		for(var x = room.x1; x < room.x2; x++) {
 
@@ -6457,7 +5910,7 @@ MapFactory.prototype = {
 //Export the Browserify module
 module.exports = MapFactory;
 
-},{"../core/utils.js":4,"../factories/enemyfactory.js":6,"../geometry/vector2.js":32,"./room.js":42}],42:[function(require,module,exports){
+},{"../core/utils.js":3,"../factories/enemyfactory.js":6,"../geometry/vector2.js":31,"./room.js":41}],41:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -6622,7 +6075,7 @@ Room.prototype = {
 //Export the Browserify module
 module.exports = Room;
 
-},{"../core/utils.js":4,"../geometry/vector2.js":32,"./tile.js":43}],43:[function(require,module,exports){
+},{"../core/utils.js":3,"../geometry/vector2.js":31,"./tile.js":42}],42:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -6635,10 +6088,8 @@ module.exports = Room;
  * @param {Number} type - The kind of tile, wall, floor, void etc
  * @param {Boolean} blockLight - Does this tile block light, yes or no
  * @param {Room} room - The room that this tile belongs to
- * @param {Number} tileRow -The row on the tileset that this current tile is on
- * @param {Number} tileNumber - The number of tile in the row that this tile is. Starting from 0
  */
-var Tile = function(type, blockLight, room, tileRow, tileNumber) {
+var Tile = function(type, blockLight, room) {
 
 	/**
 	 * @property {Number} The kind of tile, wall, floor, void etc
@@ -6646,14 +6097,9 @@ var Tile = function(type, blockLight, room, tileRow, tileNumber) {
 	this.type = type;
 
 	/**
-	 * @property {Number} The row on the tileset that this current tile is on
+	 * @property {Boolean} staticObject - A static object that is on this tile
 	 */
-	this.tileRow = tileRow;
-
-	/**
-	 * @property {Number} The number of tile in the row that this tile is. Starting from 0
-	 */
-	this.tileNumber = tileNumber;
+	this.blockLight = blockLight;
 
 	/**
 	 * @property {Room} belongsTo - The room that this tile belongs to
@@ -6664,11 +6110,6 @@ var Tile = function(type, blockLight, room, tileRow, tileNumber) {
 	 * @property {Array} entities - An array that holds all entities on this tile
 	 */
 	this.entities = [];
-
-	/**
-	 * @property {Boolean} staticObject - A static object that is on this tile
-	 */
-	this.blockLight = blockLight;
 
 	/**
 	 * @property {Number} lightLevel - The brightness of the current tile
@@ -6738,7 +6179,7 @@ Tile.prototype = {
 //Export the Browserify module
 module.exports = Tile;
 
-},{}],44:[function(require,module,exports){
+},{}],43:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -6904,7 +6345,7 @@ Queue.prototype = {
 module.exports = Queue;
 
 
-},{}],45:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
@@ -7145,236 +6586,207 @@ Scheduler.prototype = {
 //Export the Browserify module
 module.exports = Scheduler;
 
-},{"./queue.js":44}],46:[function(require,module,exports){
+},{"./queue.js":43}],45:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
 //Require necessary modules
-var Element = require('./element.js');
+var Vector2 = require('../geometry/vector2.js');
 
 /**
- * Container constructor
+ * QuickslotBar constructor
  *
- * @class Container
- * @classdesc An object that holds certain UI elements
- * Inherits from Element
+ * @class QuickslotBar
+ * @classdesc The Quickslot Bar holds all quickslots and manages the rendering of this UI element
+ * Inherits from PIXI.DisplayObjectContainer
  *
- * @param {Vector2} position - The position of this element
- * @param {Object} parent - The parent of this element
- * @param {Number} width - The width of this element
- * @param {Number} height - The height of this element
- */
-var Container = function(position, parent, width, height) {
-
-	/**
-	 * Inherit the constructor from the Element class
-	 */
-	Element.call(this, position, parent, width, height);
-
-	/**
-	 * @property {Array} elements - An array that holds all UI elements
-	 */
-	this.elements = [];
-
-};
-
-Container.prototype = Object.create(Element.prototype, {
-
-	addElement: {
-
-		/**
-		 * Function to add a new element to the UI
-		 * @protected
-		 *
-		 * @param {Element || Container} element - The element that is being added to the UI
-		 */
-		value: function(element) {
-
-			//Add the element to the elements array
-			this.elements.push(element);
-
-		}
-
-	},
-
-	removeElement: {
-
-		/**
-		 * Function to remove an element from the UI
-		 * @protected
-		 *
-		 * @param {Element} element - The element that is being removed from the UI
-		 *
-		 * @return {Boolean} Returns true when the element is removed, returns false when not
-		 */
-		value: function(element) {
-
-			//Try to find the element in both element arrays
-			var index = this.elements.indexOf(element);
-
-			//If the element isn't found, exit as soon as possible
-			if(index === -1) {
-				return false;
-			}
-
-			//The element has been found
-			this.elements.splice(index, 1);
-
-			//We've made it all the way down here so the element is removed
-			return true;
-
-		}
-
-	},
-
-	render: {
-
-		/**
-		 * Calls the render function of each of the containers children
-		 * @protected
-		 *
-		 * @param {Object} context - Reference to the current canvas context
-		 * @param {Vector2} parentPosition - The position of the previous container that called this render function
-		 */
-		value: function(context, parentPosition) {
-
-			//Check if the container and it's children even need to be rendered
-			if(!this.visible || this.alpha === 0) {
-
-				return;
-
-			}
-
-			//Create a new starting position using the provided position and the position of this container
-			var newPosition = parentPosition.combine(this.position);
-
-			//Loop through each element in this container
-			for(var i = 0; i < this.elements.length; i++) {
-
-				//Call the render function of the current element
-				this.elements[i].render(context, newPosition);
-
-			}
-
-		}
-
-	}
-
-});
-
-//Export the Browserify module
-module.exports = Container;
-
-},{"./element.js":49}],47:[function(require,module,exports){
-//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
-'use strict';
-
-//Require necessary modules
-var Element = require('../element.js');
-
-/**
- * UI Element Status Effects constructor
- *
- * @class TextLogElement
- * @classdesc An object that is able to render every status effect on a certain entity
- * Inherits from Element
- *
- * @param {Vector2} position - The position of this element
- * @param {Object} parent - The parent of this element
- * @param {Entity} target - Reference to the entity object
- */
-var StatusEffects = function(position, parent, target) {
-
-	/**
-	 * Inherit the constructor from the Element class
-	 */
-	Element.call(this, position, parent);
-
-	/**
-	 * @property {Entity} target - Reference to the entity object
-	 */
-	this.target = target;
-
-};
-
-StatusEffects.prototype = Object.create(Element.prototype, {
-
-	render: {
-
-		/**
-		 * Calls the render function of each of the containers children
-		 * @protected
-		 *
-		 * @param {Object} context - Reference to the current canvas context
-		 * @param {Vector2} parentPosition - The position of the previous container that called this render function
-		 */
-		value: function(context, parentPosition) {
-
-			//Check if the container and it's children even need to be rendered
-			if(!this.visible) {
-				return;
-			}
-
-			//Create a new starting position using the provided position and the position of this container
-			var newPosition = parentPosition.combine(this.position);
-
-			//Grab all status effects from the target
-			var statusEffects = this.target.getStatusEffects();
-
-			//Loop through each status effect
-			for(var i = 0; i < statusEffects.length; i++) {
-
-				//Define the visual style of the text, font, color, etc
-				context.font = "14px arial";
-				context.fillStyle = "rgba(255, 255, 255, 1)";
-
-				//Draw the text on screen
-				context.fillText(
-					statusEffects[i].name + ": " + statusEffects[i].turnsLeft,
-					newPosition.x,
-					newPosition.y + (50 * i)
-				);
-
-			}
-
-		}
-
-	}
-
-});
-
-//Export the Browserify module
-module.exports = StatusEffects;
-
-},{"../element.js":49}],48:[function(require,module,exports){
-//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
-'use strict';
-
-//Require necessary modules
-var Element = require('../element.js');
-
-/**
- * UI Element TextLog constructor
- *
- * @class TextLogElement
- * @classdesc An object that is able to render messages from the textlog
- * Inherits from Element
- *
- * @param {Vector2} position - The position of this element
- * @param {Object} parent - The parent of this element
  * @param {Game} game - Reference to the currently running game
  */
-var TextLogElement = function(position, parent, game) {
+var QuickslotBar = function(game) {
 
 	/**
-	 * Inherit the constructor from the Element class
+	 * Inherit the constructor from the PIXI.DisplayObjectContainer object
 	 */
-	Element.call(this, position, parent);
+	PIXI.DisplayObjectContainer.call(this);
 
 	/**
 	 * @property {Game} game - Reference to the current game object
 	 */
 	this.game = game;
+
+	/**
+	 * @property {Number} maxQuickslots - The maximum amount of quickslots displayed in this bar
+	 */
+	this.maxQuickslots = 9;
+
+};
+
+//Inherit the prototype from the PIXI.DisplayObjectContainer
+QuickslotBar.prototype = Object.create(PIXI.DisplayObjectContainer.prototype);
+QuickslotBar.prototype.constructor = QuickslotBar;
+
+/**
+ * Initialize the QuickslotBar and create PIXI objects for later use
+ * @protected
+ */
+QuickslotBar.prototype.initialize = function() {
+
+	//Calculate the base position of the quickslot container
+	var basePosition = new Vector2((this.game.width / 2) - (this.maxQuickslots * 44) - 21, this.game.height - 57);
+
+	//Create all text objects for the textlog
+	for(var i = 0; i < this.maxQuickslots; i++) {
+
+		//Calculate the new position of the quickslot
+		var quickslotPosition = new Vector2(i * 44, 0);
+		var newPosition = quickslotPosition.combine(basePosition);
+
+		//Create the texture from an image path
+		var texture = PIXI.Texture.fromFrame("itemslot.png");
+
+		//Create a new Sprite using the texture
+		var quickslot = new PIXI.Sprite(texture);
+
+		//Set the new position to the quickslot
+		quickslot.position.x = newPosition.x;
+		quickslot.position.y = newPosition.y;
+
+		//Scale the image up 3 times
+		quickslot.scale = new PIXI.Point(3, 3);
+
+		//Add the Quickslot object to the container
+		this.addChild(quickslot);
+
+		//Create a new empty PIXI.Text object and style it
+		var textObject = new PIXI.Text("" + (i + 1), { font: "10px Courier New", fill: "#606060", align: "left"});
+
+		//Calculate the new text position
+		var textPosition = newPosition.combine(new Vector2(30, 30));
+
+		//Set the correct position for this text object
+		textObject.position.x = textPosition.x;
+		textObject.position.y = textPosition.y;
+
+		//Add the new PIXI.Text object
+		//TODO: Find out why adding these text numbers slows PIXI down so much
+		//this.addChild(textObject);
+
+	}
+
+};
+
+//Export the Browserify module
+module.exports = QuickslotBar;
+
+},{"../geometry/vector2.js":31}],46:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+//Require necessary modules
+var Vector2 = require('../geometry/vector2.js');
+
+/**
+ * SpellBar constructor
+ *
+ * @class SpellBar
+ * @classdesc The Spell Bar holds all spells and manages the rendering of this UI element
+ * Inherits from PIXI.DisplayObjectContainer
+ *
+ * @param {Game} game - Reference to the currently running game
+ */
+var SpellBar = function(game) {
+
+	/**
+	 * Inherit the constructor from the PIXI.DisplayObjectContainer object
+	 */
+	PIXI.DisplayObjectContainer.call(this);
+
+	/**
+	 * @property {Game} game - Reference to the current game object
+	 */
+	this.game = game;
+
+	/**
+	 * @property {Number} maxSpellslots - The maximum amount of spell slots displayed in this bar
+	 */
+	this.maxSpellslots = 9;
+
+};
+
+//Inherit the prototype from the PIXI.DisplayObjectContainer
+SpellBar.prototype = Object.create(PIXI.DisplayObjectContainer.prototype);
+SpellBar.prototype.constructor = SpellBar;
+
+/**
+ * Initialize the QuickslotBar and create PIXI objects for later use
+ * @protected
+ */
+SpellBar.prototype.initialize = function() {
+
+	//Calculate the base position of the quickslot container
+	var basePosition = new Vector2((this.game.width / 2) + 21, this.game.height - 57);
+
+	//Create all text objects for the textlog
+	for(var i = 0; i < this.maxSpellslots; i++) {
+
+		//Calculate the new position of the quickslot
+		var quickslotPosition = new Vector2(i * 44, 0);
+		var newPosition = quickslotPosition.combine(basePosition);
+
+		//Create the texture from an image path
+		var texture = PIXI.Texture.fromFrame("itemslot.png");
+
+		//Create a new Sprite using the texture
+		var quickslot = new PIXI.Sprite(texture);
+
+		//Set the new position to the quickslot
+		quickslot.position.x = newPosition.x;
+		quickslot.position.y = newPosition.y;
+
+		//Scale the image up 3 times
+		quickslot.scale = new PIXI.Point(3, 3);
+
+		//Add the Quickslot object to the container
+		this.addChild(quickslot);
+
+		//Create a new empty PIXI.Text object and style it
+		var textObject = new PIXI.Text("" + (i + 1), { font: "10px Courier New", fill: "#606060", align: "left"});
+
+		//Calculate the new text position
+		var textPosition = newPosition.combine(new Vector2(30, 30));
+
+		//Set the correct position for this text object
+		textObject.position.x = textPosition.x;
+		textObject.position.y = textPosition.y;
+
+		//Add the new PIXI.Text object
+		//TODO: Find out why adding these text numbers slows PIXI down so much
+		//this.addChild(textObject);
+
+	}
+
+};
+
+//Export the Browserify module
+module.exports = SpellBar;
+
+},{"../geometry/vector2.js":31}],47:[function(require,module,exports){
+//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
+'use strict';
+
+/**
+ * TextLog constructor
+ *
+ * @class TextLog
+ * @classdesc The TextLog holds and stores all messages that entities send to it
+ * Inherits from PIXI.DisplayObjectContainer
+ */
+var TextLog = function() {
+
+	/**
+	 * Inherit the constructor from the PIXI.DisplayObjectContainer object
+	 */
+	PIXI.DisplayObjectContainer.call(this);
 
 	/**
 	 * @property {Number} fontSize - The size of the text
@@ -7387,6 +6799,11 @@ var TextLogElement = function(position, parent, game) {
 	this.fontSize = 12;
 
 	/**
+	 * @property {Number} margin - The margin between the lines of the text log
+	 */
+	this.margin = 5;
+
+	/**
 	 * @property {String} font - The font that the text is being rendered in
 	 */
 	this.font = "Courier New";
@@ -7396,496 +6813,532 @@ var TextLogElement = function(position, parent, game) {
 	 */
 	this.maxMessages = 5;
 
+	/**
+	 * @property {Array} messages - An array filled with all text log messages
+	 */
+	this.messages = [];
+
 };
 
-TextLogElement.prototype = Object.create(Element.prototype, {
+//Inherit the prototype from the PIXI.DisplayObjectContainer
+TextLog.prototype = Object.create(PIXI.DisplayObjectContainer.prototype);
+TextLog.prototype.constructor = TextLog;
 
-	render: {
+/**
+ * Initialize the textlog and create the PIXI.Text objects for later use
+ * @protected
+ */
+TextLog.prototype.initialize = function() {
 
-		/**
-		 * Calls the render function of each of the containers children
-		 * @protected
-		 *
-		 * @param {Object} context - Reference to the current canvas context
-		 * @param {Vector2} parentPosition - The position of the previous container that called this render function
-		 */
-		value: function(context, parentPosition) {
+	//Create all text objects for the textlog
+	for(var i = 0; i < this.maxMessages; i++) {
 
-			//Check if the container and it's children even need to be rendered
-			if(!this.visible) {
+		//Create a new empty PIXI.Text object and style it
+		var textObject = new PIXI.Text("", { font: this.fontSize + "px " + this.font, fill: this.color, align: "left"});
 
-				return;
+		//Set the correct position for this text object
+		textObject.position.x = 15;
+		textObject.position.y = 15 + ((textObject.height + this.margin) * i);
 
-			}
-
-			//Create a new starting position using the provided position and the position of this container
-			var newPosition = parentPosition.combine(this.position);
-
-			//Grab all messages from the text log
-			var messages = this.game.textLog.getMessages();
-
-			//Determine what the lineHeight is
-			var lineHeight = this.fontSize + 5;
-
-			//Loop through each element in this container
-			for(var i = 0; i < this.maxMessages; i++) {
-
-				//If there isn't another message in the text log, stop here
-				if(!messages[messages.length - 1 - i]) {
-					break;
-				}
-
-				//Define the visual style of the text, font, color, etc
-				context.font = this.fontSize + "px " + this.font;
-				context.fillStyle = this.color;
-
-				//Draw the text on screen
-				context.fillText(
-					messages[messages.length - 1 - i],
-					newPosition.x,
-					newPosition.y + lineHeight + (lineHeight * i)
-				);
-
-			}
-
-		}
+		//Add the new PIXI.Text object
+		this.addChild(textObject);
 
 	}
 
-});
+};
+
+/**
+ * Calls the render function of each of the containers children
+ * @protected
+ */
+TextLog.prototype.updateText = function() {
+
+	//Grab all messages from the text log
+	var messages = this.getMessages();
+
+	//Loop through each element in this container
+	for(var i = 0; i < this.maxMessages; i++) {
+
+		//If there isn't another message in the text log, stop here
+		if(!messages[messages.length - 1 - i]) {
+			break;
+		}
+
+		//Set the text from the textlog in the PIXI.js objects
+		this.getChildAt(i).setText(messages[messages.length - 1 - i]);
+
+	}
+
+};
+
+/**
+ * Function to add a new message to the text log
+ * @protected
+ *
+ * @param {String} message - The message that has to be stored
+ */
+TextLog.prototype.addMessage = function(message) {
+
+	//Add the new message
+	this.messages.push(message);
+
+	//Update the text in each of the PIXI.Text objects that get rendered on screen
+	this.updateText();
+
+};
+
+/**
+ * Function that returns all messages
+ * @protected
+ *
+ * @return {Array} The array with all messages
+ */
+TextLog.prototype.getMessages = function() {
+
+	//Return all messages
+	return this.messages;
+
+};
+
+/**
+ * Clear all messages stored in the textlog
+ * @protected
+ */
+TextLog.prototype.clear = function() {
+
+	//Clear the messages array
+	this.messages = [];
+
+	//Loop through each element in the container
+	for(var i = 0; i < this.maxMessages; i++) {
+
+		//Set the text to an empty string
+		this.getChildAt(i).setText("");
+
+	}
+
+};
 
 //Export the Browserify module
-module.exports = TextLogElement;
+module.exports = TextLog;
 
-},{"../element.js":49}],49:[function(require,module,exports){
+},{}],48:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
 /**
- * Element constructor
+ * Tooltip Element constructor
  *
- * @class Element
- * @classdesc A single UI element
- *
- * @param {Vector2} position - The position of this element
- * @param {Object} parent - The parent of this element
- * @param {Number} width - The width of this element
- * @param {Number} height - The height of this element
+ * @class TooltipElement
+ * @classdesc The Tooltip Element holds and stores all messages that entities send to it
+ * Inherits from PIXI.DisplayObjectContainer
  */
-var Element = function(position, parent, width, height) {
+var TooltipElement = function() {
 
 	/**
-	 * @property {Vector2} position - The position of this element
+	 * Inherit the constructor from the PIXI.DisplayObjectContainer object
 	 */
-	this.position = position;
+	PIXI.DisplayObjectContainer.call(this);
 
 	/**
-	 * @property {Number} width - The width of this element
+	 * @property {PIXI.Graphics} background - The title of the tooltip
 	 */
-	this.width = width || 300;
+	this.background = null;
 
 	/**
-	 * @property {Number} height - The height of this element
+	 * @property {PIXI.Text} title - The title of the tooltip
 	 */
-	this.height = height || 300;
+	this.title = null;
 
 	/**
-	 * @property {Boolean} visible - Is this UI element visible or not
+	 * @property {PIXI.Text} type - The type of entity
 	 */
-	this.visible = true;
+	this.type = null;
 
 	/**
-	 * @property {Object} parent - The parent of this element
+	 * @property {PIXI.Text} description - The description of this entity
 	 */
-	this.parent = parent;
-
-	/**
-	 * @property {Number} alpha - The opacity of the element
-	 */
-	this.alpha = 1;
-
-	/**
-	 * @property {Number} scale - The scale factor of the element
-	 */
-	this.scale = 1;
-
-	/**
-	 * @property {Boolean} hover - Is the user currently hovering this element
-	 */
-	this.hover = false;
-
+	this.description = null;
 };
 
-Element.prototype = {
-
-	/**
-	 * Toggle the visibility of this UI element
-	 * @protected
-	 */
-	toggleVisibility: function() {
-
-		//Invert the visibility of the UI element
-		this.visible = !this.visible;
-
-	},
-
-	/**
-	 * Return the position based on the parent's position
-	 * @protected
-	 */
-	getPosition: function() {
-
-		//Check if this element has a parent
-		if(this.parent === null) {
-
-			//No parent, this is the final position
-			return this.position;
-
-		}else{
-
-			//Get the position from the parent
-			var parentPosition = this.parent.getPosition();
-
-			//Combine that position with this position
-			return parentPosition.combine(this.position);
-
-		}
-
-	},
-
-	/**
-	 * Function that is here to be overwritten
-	 * @protected
-	 */
-	onHover: function() {
-
-		//Overwrite
-
-	},
-
-	/**
-	 * Function that is here to be overwritten
-	 * @protected
-	 */
-	onClick: function() {
-
-		//Overwrite
-
-	}
-
-};
-
-//Export the Browserify module
-module.exports = Element;
-
-},{}],50:[function(require,module,exports){
-//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
-'use strict';
-
-//Require necessary modules
-var Element = require('../element.js');
+//Inherit the prototype from the PIXI.DisplayObjectContainer
+TooltipElement.prototype = Object.create(PIXI.DisplayObjectContainer.prototype);
+TooltipElement.prototype.constructor = TooltipElement;
 
 /**
- * Image Element constructor
- *
- * @class Image
- * @classdesc An UI image element
- * Inherits from Element
- *
- * @param {Vector2} position - The position of the previous container that called this render function
- * @param {Object} parent - The parent of this element
- * @param {String} image - The source of the image that is being used
- * @param {Number} scale - (optional) The scale of the image, defaults to 1
+ * Initialize the textlog and create the PIXI.Text objects for later use
+ * @protected
  */
-var ImageElement = function(position, parent, image, scale) {
+TooltipElement.prototype.initialize = function() {
 
-	/**
-	 * Inherit the constructor from the Element class
-	 */
-	Element.call(this, position, parent);
+	this.background = new PIXI.Graphics();
 
-	/**
-	 * @property {String} image - The source of the image that is being used
-	 */
-	this.image = image;
+	this.addChild(this.background);
 
-	/**
-	 * @property {Number} scale - The scale of the image, defaults to 1
-	 */
-	this.scale = scale || 1;
+	//Create all objects for the tooltip
+	this.title = new PIXI.Text(
+		"",
+		{
+			font: "bold 12px Courier New",
+			fill: "#ffffff",
+			wordWrap: true,
+			wordWrapWidth: 150
+		}
+	);
+
+	this.title.position.x = 15;
+
+	this.addChild(this.title);
+
+	//Create all objects for the tooltip
+	this.type = new PIXI.Text(
+		"",
+		{
+			font: "12px Courier New",
+			fill: "#ffffff",
+			wordWrap: true,
+			wordWrapWidth: 150
+		}
+	);
+
+	this.type.position.x = 15;
+
+	this.addChild(this.type);
+
+	//Create all objects for the tooltip
+	this.description = new PIXI.Text(
+		"",
+		{
+			font: "12px Courier New",
+			fill: "#b4b4b4",
+			wordWrap: true,
+			wordWrapWidth: 150
+		}
+	);
+
+	this.description.position.x = 15;
+
+	this.addChild(this.description);
 
 };
 
-ImageElement.prototype = Object.create(Element.prototype, {
+/**
+ * Calls the render function of each of the containers children
+ * @protected
+ */
+TooltipElement.prototype.updateText = function(title, type, description) {
 
-	render: {
+	this.title.setText(title);
+	this.type.setText(type);
+	this.description.setText(description);
 
-		/**
-		 * Returns a function that handles rendering the current Element
-		 * @protected
-		 *
-		 * @param {Object} context - Reference to the current canvas context
-		 * @param {Vector2} parentPosition - The position of the previous container that called this render function
-		 */
-		value: function(context, parentPosition) {
+	var yPos = 15;
 
-			//Create a new starting position using the provided position and the position of this element
-			var newPosition = parentPosition.combine(this.position);
+	this.title.position.y = yPos;
 
-			//TODO: Use a preloader and only get the file once, not every frame
-			//Get the image
-			var image = document.getElementById(this.image);
-
-			//Draw the image on the canvas context
-			context.drawImage(
-				image,
-				newPosition.x,
-				newPosition.y,
-				image.width * this.scale,
-				image.height * this.scale
-			);
-
-		}
-
+	if(title !== ""){
+		yPos += this.title.height;
 	}
 
-});
+	this.type.position.y = yPos;
+
+	if(type !== ""){
+		yPos += this.type.height;
+	}
+
+	this.description.position.y = yPos;
+
+	if(description !== ""){
+		yPos += this.description.height;
+	}
+
+	yPos += 15;
+
+	this.background.clear();
+	this.background.beginFill(0x000000, 0.5);
+	this.background.drawRect(0,0, this.width + 30, yPos);
+
+};
 
 //Export the Browserify module
-module.exports = ImageElement;
+module.exports = TooltipElement;
 
-},{"../element.js":49}],51:[function(require,module,exports){
+},{}],49:[function(require,module,exports){
 //Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
 'use strict';
 
 //Require necessary modules
-var Element = require('../element.js');
+var TextLog = require('../ui/textlog.js'),
+	QuickslotBar = require('../ui/quickslotbar.js'),
+	SpellBar = require('../ui/spellbar.js'),
+	TooltipElement = require('../ui/tooltipelement.js'),
+	Vector2 = require('../geometry/vector2.js');
 
 /**
- * Text Element constructor
+ * UI constructor
  *
- * @class Text
- * @classdesc An UI text element
- * Inherits from Element
+ * @class UI
+ * @classdesc The UI object holds all UI elements
+ * Inherits from PIXI.DisplayObjectContainer
  *
- * @param {Vector2} position - The position of the previous container that called this render function
- * @param {Object} parent - The parent of this element
- * @param {String} text - The text that is being displayed
- * @param {String} color - (optional) The color of the text. In RGBA format: rgba(255, 255, 255, 1)
- * @param {Number} fontSize - (optional) The size of the text
- * @param {String} font - (optional) The font that the text is being rendered in
+ * @param {Game} game - Reference to the currently running game
  */
-var TextElement = function(position, parent, text, color, fontSize, font) {
+var UI = function(game) {
 
 	/**
-	 * Inherit the constructor from the Element class
+	 * Inherit the constructor from the PIXI.DisplayObjectContainer object
 	 */
-	Element.call(this, position, parent);
+	PIXI.DisplayObjectContainer.call(this);
 
 	/**
-	 * @property {String} text - The text that is being displayed
+	 * @property {Game} game - Reference to the current game object
 	 */
-	this.text = text;
+	this.game = game;
 
 	/**
-	 * @property {Number} fontSize - The size of the text
+	 * @property {Stats} stats - Reference to Stats object
 	 */
-	this.color = color || "rgba(255, 255, 255, 1)";
+	this.stats = null;
 
 	/**
-	 * @property {Number} fontSize - The size of the text
+	 * @property {TextLog} textlog - Reference to TextLog object
 	 */
-	this.fontSize = fontSize || 12;
+	this.textLog = null;
 
 	/**
-	 * @property {String} font - The font that the text is being rendered in
+	 * @property {QuickslotBar} quickslotBar - Reference to QuickslotBar object
 	 */
-	this.font = font || "Courier New";
-
-};
-
-TextElement.prototype = Object.create(Element.prototype, {
-
-	render: {
-
-		/**
-		 * Returns a function that handles rendering the current Element
-		 * @protected
-		 *
-		 * @param {Object} context - Reference to the current canvas context
-		 * @param {Vector2} parentPosition - The position of the previous container that called this render function
-		 */
-		value: function(context, parentPosition) {
-
-			//Create a new starting position using the provided position and the position of this element
-			var newPosition = parentPosition.combine(this.position);
-
-			//Determine what the lineHeight is
-			var lineHeight = this.fontSize;
-
-			//Define the visual style of the text, font, color, etc
-			context.font = this.fontSize + "px " + this.font;
-			context.fillStyle = this.color;
-
-			//Draw the text on screen
-			context.fillText(
-				this.text,
-				newPosition.x,
-				newPosition.y + lineHeight
-			);
-
-		}
-
-	}
-
-});
-
-//Export the Browserify module
-module.exports = TextElement;
-
-
-},{"../element.js":49}],52:[function(require,module,exports){
-//Because Browserify encapsulates every module, use strict won't apply to the global scope and break everything
-'use strict';
-
-/**
- * InteractionManager constructor
- *
- * @class InteractionManager
- * @classdesc An object that manages all mouse interaction and interactive elements
- *
- * @param {Object} target - The target of this interaction manager
- */
-var InteractionManager = function(target) {
+	this.quickslotBar = null;
 
 	/**
-	 * @property {Object} target - The target of this interaction manager
+	 * @property {SpellBar} spellbar - Reference to SpellBar object
 	 */
-	this.target = target;
+	this.spellbar = null;
 
 	/**
-	 * @property {Object} mousePos - Object with x and y coordinate of the cursor on the canvas
+	 * @property {PIXI.Sprite} mousePointer - Reference to the mouse pointer object
 	 */
-	this.mousePos = {x: 0, y: 0};
+	this.mousePointer = null;
 
 	/**
-	 * @property {Array} elements - Array that stores all interactive elements
+	 * @property {PIXI.DisplayObjectContainer} tooltip - Reference to the tooltip object
 	 */
-	this.elements = [];
+	this.tooltip = null;
 
 	//Initialize itself
 	this.initialize();
 
 };
 
-InteractionManager.prototype = {
+//Inherit the prototype from the PIXI.DisplayObjectContainer
+UI.prototype = Object.create(PIXI.DisplayObjectContainer.prototype);
+UI.prototype.constructor = UI;
 
-	/**
-	 * Initialize the Interaction Manager with the correct event listeners
-	 * @protected
-	 */
-	initialize: function() {
+/**
+ * Initialize the UI elements and add them to this container
+ * @protected
+ */
+UI.prototype.initialize = function() {
 
-		//Add the mouse move event listener to the canvas to always have the mouse position stored
-		this.target.addEventListener("mousemove", this.onMouseMove.bind(this));
-		this.target.addEventListener("mousedown", this.onMouseDown.bind(this));
+	//Create the Stats object
+	this.initializeStats();
 
-	},
+	//Create the Textlog object
+	this.initializeTextLog();
 
-	/**
-	 * Get the position of the mouse on the canvas and store it for later use
-	 * @protected
-	 */
-	onMouseMove: function(event) {
+	//Initialize the bar's at the bottom of the UI
+	this.initializeBars();
 
-		//Calculate the mouse position
-		this.calculatePosition(event);
+	//Initialize the mouse pointer
+	this.initializeMousePointer();
 
-		//Loop through all interactive elements
-		for(var i = 0; i < this.elements.length; i++) {
+	//Initialize the tooltip
+	this.initializeTooltip();
 
-			//Don't continue if the element is invisible
-			if(!this.elements[i].visible || this.elements[i].alpha === 0) {
+	//Attach a mouse move event to the stage
+	this.game.stage.mousemove = this.mouseMove.bind(this);
 
-				return;
+	//Add the container object to the stage
+	this.game.stage.addChild(this);
 
-			}
+};
 
-			//Get the position of this element on the canvas
-			var position = this.elements[i].getPosition();
+/**
+ * Initialize the UI Stats object and add it to the DOM
+ * @protected
+ */
+UI.prototype.initializeStats = function() {
 
-			//Check if our mouse hovers the element
-			if(this.mousePos.x >= position.x && this.mousePos.x <= position.x + this.elements[i].width && this.mousePos.y >= position.y && this.mousePos.y <= position.y + this.elements[i].height) {
+	//Create a new stats component that handles measuring the FPS and milliseconds it takes to generate 1 frame
+	this.stats = new Stats();
 
-				//We are hovering the current element
-				this.elements[i].onHover();
+	//Set the correct mode for the stats component
+	this.stats.setMode(0); // 0: fps, 1: ms
 
-				//Break the for loop, because we don't want underlaying elements to also have the hover variable on true
-				break;
+	//Align the element to the top-right
+	this.stats.domElement.style.position = 'absolute';
+	this.stats.domElement.style.right = '10px';
+	this.stats.domElement.style.top = '10px';
 
-			}
+	//Append the new stats element to the body
+	document.body.appendChild(this.stats.domElement);
 
-		}
+};
 
-	},
+/**
+ * Initialize the UI TextLog object and add a message to it
+ * @protected
+ */
+UI.prototype.initializeTextLog = function() {
 
-	/**
-	 * Function that is executed when the user pressed his mouse
-	 * @protected
-	 */
-	onMouseDown: function(event) {
+	//Create and initialize the TextLog
+	this.textLog = new TextLog();
+	this.textLog.initialize();
 
-		//Calculate the mouse position
-		this.calculatePosition(event);
+	//Add the starting string to the message variable
+	var textLogMessage = "You enter the basement and look around";
 
-		//Loop through all interactive elements
-		for(var i = 0; i < this.elements.length; i++) {
+	//Add the message to the textlog
+	this.textLog.addMessage(textLogMessage);
 
-			//Don't continue if the element is invisible
-			if(!this.elements[i].visible || this.elements[i].alpha === 0) {
+	//Add the TextLog to the UI container
+	this.addChild(this.textLog);
 
-				return;
+};
 
-			}
 
-			//Get the position of this element on the canvas
-			var position = this.elements[i].getPosition();
+/**
+ * Initialize the UI QuickslotBar and the SpellBar
+ * @protected
+ */
+UI.prototype.initializeBars = function() {
 
-			//Check if our mouse hovers the element
-			if(this.mousePos.x >= position.x && this.mousePos.x <= position.x + this.elements[i].width && this.mousePos.y >= position.y && this.mousePos.y <= position.y + this.elements[i].height) {
+	//Create and initialize the QuickslotBar
+	this.quickslotBar = new QuickslotBar(this.game);
+	this.quickslotBar.initialize();
 
-				//We are hovering the current element
-				this.elements[i].onClick();
+	//Add the QuickslotBar to the UI container
+	this.addChild(this.quickslotBar);
 
-				//Break the for loop, because we don't want underlaying elements to also have the hover variable on true
-				break;
+	//Create and initialize the SpellBar
+	this.spellBar = new SpellBar(this.game);
+	this.spellBar.initialize();
 
-			}
+	//Add the SpellBar to the UI container
+	this.addChild(this.spellBar);
 
-		}
+};
 
-	},
+/**
+ * Initialize the UI Mouse Pointer
+ * @protected
+ *
+ */
+UI.prototype.initializeMousePointer = function() {
 
-	/**
-	 * Function that calculates the mouse position on the canvas
-	 * @protected
-	 */
-	calculatePosition: function(event) {
+	this.mousePointer = PIXI.Sprite.fromFrame("mousepointer.png");
+	this.mousePointer.scale = new PIXI.Point(3,3);
 
-		//Get the rectangle from the target canvas
-		var rect = this.target.getBoundingClientRect();
+	//Add the SpellBar to the UI container
+	this.addChild(this.mousePointer);
 
-		//Calculate the mouse position
-		this.mousePos = {
-			x: event.clientX - rect.left,
-			y: event.clientY - rect.top
-		};
+};
+
+/**
+ * Initialize the UI Tooltip
+ * @protected
+ */
+UI.prototype.initializeTooltip = function() {
+
+	//Create a new Tooltip object and initialize it
+	this.tooltip = new TooltipElement();
+	this.tooltip.initialize();
+
+	//Add the Tooltip to the UI container
+	this.addChild(this.tooltip);
+
+};
+
+/**
+ * The function that is called everytime the mouse moves
+ * @protected
+ */
+//TODO: Clean up this function and split it up
+UI.prototype.mouseMove = function(mousedata) {
+
+	//Define variables
+	var map = this.game.map;
+	var camera = this.game.world.camera;
+	var tilesize = (map.settings.tileSize * this.game.settings.zoom);
+
+	//Calculate the offset of the camera, how many pixels are left at the left and top of the screen
+	var cameraXOffset = camera.position.x % tilesize;
+	var cameraYOffset = camera.position.y % tilesize;
+
+	//Calculate at which tile the mouse is currently pointing relative to the camera
+	var tileXRel = Math.floor((mousedata.global.x + cameraXOffset) / tilesize);
+	var tileYRel = Math.floor((mousedata.global.y + cameraYOffset) / tilesize);
+
+	//Calculate at which tile the mouse is currently pointing absolute to the camera
+	var tileXAbs = Math.floor((mousedata.global.x + camera.position.x) / tilesize);
+	var tileYAbs = Math.floor((mousedata.global.y + camera.position.y) / tilesize);
+
+	//Create a new Vector2 object of the tile's position
+	var tilePosition = new Vector2(tileXAbs, tileYAbs);
+
+	//If the tile that the mouse is pointing at is not within the map, quit here
+	if(!map.insideBounds(tilePosition)) {
+		this.tooltip.visible = this.mousePointer.visible = false;
+		return;
+	}
+
+	//Get the tile at the mouse position
+	var tile = map.getTileAt(tilePosition);
+
+	//If the tile isn't a floor tile, you can't walk there so why bother showing the mouse pointer
+	//Also don't show the mouse pointer if you haven't explored the tile yet
+	if(tile.type !== 2 || !tile.explored) {
+		this.tooltip.visible = this.mousePointer.visible = false;
+		return;
+	}
+
+	//The mouse pointer should be visible at this point and should have the right position
+	this.mousePointer.visible = true;
+	this.mousePointer.position = new PIXI.Point(tileXRel * tilesize - cameraXOffset, tileYRel * tilesize - cameraYOffset);
+
+	//Check if there are entities at the tile
+	if(tile.entities.length === 0) {
+		this.tooltip.visible = false;
+		return;
+	}
+
+	//Get the last entity
+	var lastEntity = tile.entities[tile.entities.length - 1];
+
+	//Check if the entity even has the tooltip component, if not the tooltip should not be visible
+	if(lastEntity.hasComponent("tooltip")) {
+
+		//Get the component
+		var tooltipComponent = lastEntity.getComponent("tooltip");
+
+		//Update the text from the Tooltip Element
+		this.tooltip.updateText(tooltipComponent.title, tooltipComponent.type, tooltipComponent.description);
+
+		//Change the position to the mouse position
+		this.tooltip.position = new PIXI.Point(mousedata.global.x, mousedata.global.y);
+
+		//Make the tooltip visible again!
+		this.tooltip.visible = true;
+
+	}else{
+
+		this.tooltip.visible = false;
 
 	}
 
 };
 
 //Export the Browserify module
-module.exports = InteractionManager;
+module.exports = UI;
 
-},{}]},{},[33]);
+},{"../geometry/vector2.js":31,"../ui/quickslotbar.js":45,"../ui/spellbar.js":46,"../ui/textlog.js":47,"../ui/tooltipelement.js":48}]},{},[32]);
