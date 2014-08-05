@@ -1,9 +1,9 @@
-# Random Dungeon Generation V.0.6.6
+# Random Dungeon Generation V.0.6.7
 
 This project started out as a small project to experiment with random dungeon generation. Quickly I began to notice that this was a lot of fun to work with and I added a player. And I added some enemies. And I rewrote the map generator. I added turns. Etc etc, until we ended up here!
 A roguelike game with a random dungeon generator that I am creating purely in javascript on canvas!
 
-_Version: 0.6.6 - 5 August 2014_
+_Version: 0.6.7 - Not released yet_
 
 By [Stefan Weck](http://www.stefanweck.nl),
 
@@ -31,10 +31,6 @@ This system allows me to attach components to entities. Examples of components a
 
 You want to know what's on the other side of that wall? Go check it out, you don't have X-ray vision to look through walls. A thick fog of war will hide everything that isn't lit up by your torch, allowing enemies to sneak upon to you. Who know what happens in the dark.
 
-**Configurable Settings**
-
-Currently this only applies to fellow programmers that know their way around the code. But in the future I will let people choose their own settings before they start their playthrough. Ensuring once again a new and fresh experience.
-
 ## Demo
 
 ![Some Other Characters](http://stefanweck.nl/github/github_banner_2.png)
@@ -44,10 +40,6 @@ on GitHub right here: [Live Demo](http://stefanweck.nl/github/dungeongeneration/
 Note: Move the character around with your WASD keys!
 
 ## What's Next
-
-**PIXI**
-
-Implementing Pixi.js! It's much better to use a library for handling the rendering than to write everything myself.
 
 **Looting**
 
@@ -76,6 +68,10 @@ Run `grunt dev` to watch every module needed in the project for changes. Watchif
 Run `grunt debug` to let JSHint check the code for you, a tool that helps to detect errors and potential problems in your JavaScript code.
 
 ## Changelog
+
+**v0.6.7**
+
+- 
 
 **v0.6.6**
 
