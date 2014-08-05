@@ -45,10 +45,6 @@ Note: Move the character around with your WASD keys!
 
 ## What's Next
 
-**PIXI**
-
-Implementing Pixi.js! It's much better to use a library for handling the rendering than to write everything myself.
-
 **Looting**
 
 One of the more important parts of the game is being able to loot enemies, chests and other piles of garbage! This means the player should have an inventory to store and use all these items.
