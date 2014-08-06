@@ -71,7 +71,7 @@ Run `grunt debug` to let JSHint check the code for you, a tool that helps to det
 
 **v0.6.7**
 
-- 
+- Entities can now be limited to attacking specific entity types
 
 **v0.6.6**
 
